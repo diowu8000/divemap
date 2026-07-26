@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>DiveMap 基準版本 v68 - 2026-07-24（修正側邊欄不會自動跳出+Leaflet尺寸同步）</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+.leaflet-container{background:#0d1c2e;font-family:'DM Sans',sans-serif}
+.leaflet-control-attribution{background:rgba(10,21,32,.7)!important;color:var(--tm)!important;font-size:8px!important}
+.leaflet-control-attribution a{color:var(--ts)!important}
+.dive-mk{position:absolute;left:0;top:0}
+.transport-pt{position:absolute;left:0;top:0}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a1520;padding:20px}
+:root{
+  --bg:#0a1520;--surf:#0d1c2e;--card:#102338;--hover:#142c46;
+  --b:rgba(26,58,92,.7);
+  --t:#e8f4ff;--ts:#7aabb0;--tm:#3d6070;
+  --blue:#0ea5e9;--red:#ef4444;--amber:#f59e0b;--cyan:#38bdf8;--green:#10b981;
+  font-family:'DM Sans',sans-serif;
+}
+.app{background:var(--bg);border-radius:16px;border:1px solid var(--b);overflow:hidden;display:flex;flex-direction:column;height:640px;max-width:900px;margin:0 auto}
+.topbar{background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:10}
+.logo{font-size:15px;font-weight:600;color:var(--t);flex-shrink:0}
+.logo span{color:var(--blue)}
+.searchbox{flex:1;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
+.searchbox input{background:none;border:none;outline:none;font-size:12px;color:var(--t);width:100%}
+.searchbox input::placeholder{color:var(--tm)}
+.ib{width:30px;height:30px;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:14px;cursor:pointer;flex-shrink:0}
+.ib.on{background:rgba(56,189,248,.15);border-color:rgba(56,189,248,.4);color:var(--cyan)}
+.bc{padding:7px 14px;font-size:11px;color:var(--ts);background:rgba(10,21,32,.7);border-bottom:0.5px solid var(--b);display:flex;align-items:center;gap:5px;z-index:10}
+.bci{cursor:pointer;padding:2px 6px;border-radius:5px}
+.bci:hover{background:rgba(255,255,255,.06);color:var(--t)}
+.bci.act{color:var(--blue);font-weight:500}
+.body{display:flex;flex:1;overflow:hidden;position:relative}
+.sidebar{width:0;background:var(--surf);border-right:0.5px solid transparent;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width .22s ease,border-color .22s}
+.sidebar.open{width:190px;border-right-color:var(--b)}
+.sb-inner{width:190px;display:flex;flex-direction:column;flex:1;overflow:hidden}
+.sb-hdr{padding:10px 12px 5px;flex-shrink:0;display:flex;justify-content:space-between}
+.sb-ttl{font-size:10px;color:var(--tm);text-transform:uppercase;letter-spacing:.08em}
+.sb-close{cursor:pointer;color:var(--tm)}
+.sb-list{flex:1;overflow-y:auto;padding:4px 6px 8px}
+.si{padding:6px 8px;border-radius:7px;cursor:pointer;display:flex;align-items:center;gap:7px;margin-bottom:2px}
+.si:hover{background:var(--hover)}
+.si.act{background:rgba(14,165,233,.1);border:0.5px solid rgba(14,165,233,.25)}
+.si-swatch{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.si-name{font-size:12px;color:var(--t);flex:1}
+.si-sub{font-size:9px;color:var(--tm);font-family:'DM Mono',monospace;flex-shrink:0}
+.si-badge{font-size:8px;padding:1px 6px;border-radius:99px;flex-shrink:0;border:0.5px solid}
+.si.route{background:rgba(16,185,129,.08);color:#34d399}
+.si.route:hover{background:rgba(16,185,129,.15)}
+.route-badge{position:absolute;top:10px;left:10px;background:rgba(16,185,129,.15);border:0.5px solid rgba(16,185,129,.4);border-radius:8px;padding:6px 10px;font-size:10px;color:#34d399;display:flex;align-items:center;gap:5px;z-index:6}
+.route-mk-num{width:20px;height:20px;border-radius:50%;background:var(--green);color:#04342c;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px rgba(16,185,129,.2)}
+.route-mk-lbl{position:absolute;top:24px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--ts);background:rgba(10,21,32,.9);padding:2px 6px;border-radius:3px;white-space:nowrap;border:0.5px solid var(--b)}
+.transport-pt{position:absolute;display:flex;flex-direction:column;align-items:center;gap:3px;transform:translate(-50%,-50%);pointer-events:none;z-index:3}
+.transport-pt-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--amber);background:rgba(245,158,11,.25);box-shadow:0 0 0 4px rgba(245,158,11,.15)}
+.transport-pt.transport-to .transport-pt-dot{border-color:var(--blue);background:rgba(56,189,248,.25);box-shadow:0 0 0 4px rgba(56,189,248,.15)}
+.transport-pt-lbl{font-size:9px;color:var(--t);background:rgba(10,21,32,.92);padding:2px 7px;border-radius:3px;white-space:nowrap;border:0.5px solid var(--b);font-weight:500}
+.route-hdr{padding:14px;border-bottom:0.5px solid var(--b)}
+.route-ttl{font-size:14px;font-weight:500;color:var(--t);margin-bottom:2px}
+.route-sub{font-size:10px;color:var(--tm)}
+.route-days{padding:12px}
+.route-day{position:relative;padding-left:16px;padding-bottom:10px;font-size:11px}
+.route-day::before{content:'';position:absolute;left:3px;top:14px;bottom:-2px;width:0.5px;background:var(--b)}
+.route-day:last-child::before{display:none}
+.route-day-dot{position:absolute;left:0;top:2px;width:8px;height:8px;border-radius:50%;background:var(--green)}
+.route-day-lbl{color:var(--t);font-weight:500}
+.route-day-sub{color:var(--tm);font-size:9px}
+.sb-peek{position:absolute;left:0;top:12px;z-index:8;width:18px;height:40px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-left:none;border-radius:0 10px 10px 0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm)}
+.sb-peek.hidden{opacity:0;pointer-events:none}
+.panel-peek{position:absolute;right:0;top:12px;z-index:8;width:18px;height:40px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-right:none;border-radius:10px 0 0 10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm)}
+.panel-peek.hidden{opacity:0;pointer-events:none}
+.map-wrap{flex:1;position:relative;overflow:hidden;background:var(--surf);cursor:grab}
+.map-layer{position:absolute;inset:0;transform-origin:0 0}
+.map-layer.animate{transition:transform .5s cubic-bezier(0.22,1,0.36,1)}
+.world-svg{position:absolute;left:0;top:0}
+.country-fill{pointer-events:none}
+.country-hit{cursor:pointer;fill:transparent;stroke:none}
+.mk-layer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:12px;gap:8px;z-index:20;background:var(--surf)}
+.spin{width:14px;height:14px;border:2px solid var(--b);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.wx-card{position:absolute;top:10px;left:10px;background:rgba(13,28,46,.94);border:0.5px solid rgba(56,189,248,.3);border-radius:10px;padding:7px 11px;font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:8px;z-index:6;opacity:0;transition:opacity .3s}
+.wx-card.show{opacity:1}
+.wx-t{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--t)}
+.wx-sub{color:var(--tm);font-size:9px}
+.map-ctrl{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:4px;z-index:6}
+.stats{position:absolute;bottom:10px;right:10px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-radius:10px;padding:8px 12px;z-index:6}
+.st-v{font-family:'DM Mono',monospace;font-size:14px;color:var(--t)}
+.dive-mk{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transform:translate(-50%,-50%);pointer-events:auto;transition:left .5s cubic-bezier(0.22,1,0.36,1),top .5s cubic-bezier(0.22,1,0.36,1);z-index:1}
+.dive-mk:hover{z-index:3}
+.dive-mk .ring{width:13px;height:13px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:7px}
+.dive-mk .ring.mu{background:rgba(14,165,233,.25);border-color:var(--blue);color:var(--blue)}
+.dive-mk .ring.mv{background:rgba(239,68,68,.25);border-color:var(--red);color:var(--red)}
+.dive-mk .lbl{font-size:8px;color:var(--ts);background:rgba(10,21,32,.94);padding:1px 5px;border-radius:3px;white-space:nowrap;border:0.5px solid var(--b);opacity:0;transition:opacity .15s}
+.dive-mk:hover .lbl{opacity:1}
+.dive-mk.sel{z-index:5}
+.dive-mk.sel .ring{transform:scale(1.5);box-shadow:0 0 0 4px rgba(56,189,248,.25),0 0 12px rgba(56,189,248,.6);animation:selPulse 1.6s ease-in-out infinite}
+.dive-mk.sel .lbl{opacity:1;background:rgba(14,165,233,.95);color:#fff;border-color:var(--blue);font-weight:600}
+.dive-mk.sel .route-mk-num{transform:scale(1.4);box-shadow:0 0 0 4px rgba(56,189,248,.3),0 0 12px rgba(56,189,248,.7);animation:selPulse 1.6s ease-in-out infinite;background:var(--blue);color:#fff}
+.dive-mk.sel .route-mk-lbl{background:rgba(14,165,233,.95);color:#fff;border-color:var(--blue);font-weight:600}
+@keyframes selPulse{0%,100%{box-shadow:0 0 0 4px rgba(56,189,248,.25),0 0 12px rgba(56,189,248,.6)}50%{box-shadow:0 0 0 7px rgba(56,189,248,.12),0 0 16px rgba(56,189,248,.8)}}
+.panel{width:0;background:var(--card);border-left:0.5px solid var(--b);overflow-y:auto;flex-shrink:0;transition:width .3s ease}
+.panel.open{width:240px}
+.hero{width:100%;height:90px;overflow:hidden;flex-shrink:0;position:relative}
+.visit-badge{position:absolute;top:8px;right:8px;background:rgba(16,185,129,.85);color:#fff;font-size:9px;font-weight:600;padding:3px 8px;border-radius:99px}
+.pbody{padding:14px}
+.pname{font-size:16px;font-weight:600;color:var(--t);margin-bottom:1px}
+.pnameen{font-size:11px;color:var(--tm);margin-bottom:10px}
+.status-card{background:linear-gradient(135deg, rgba(56,189,248,.08), rgba(245,158,11,.08));border:0.5px solid rgba(56,189,248,.25);border-radius:10px;padding:9px 11px;margin-bottom:10px}
+.status-row{display:flex;align-items:center;justify-content:space-between}
+.status-wx{display:flex;align-items:center;gap:7px}
+.status-temp{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--t)}
+.status-sub{font-size:9px;color:var(--tm)}
+.ptags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:9px}
+.ptag{font-size:10px;padding:2px 7px;border-radius:4px;border:0.5px solid}
+.tb{background:rgba(14,165,233,.1);border-color:rgba(14,165,233,.25);color:#38bdf8}
+.tg{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.2);color:#34d399}
+.mg{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:9px}
+.mc{background:var(--surf);border:0.5px solid var(--b);border-radius:6px;padding:6px 8px}
+.mc-l{font-size:9px;color:var(--tm);text-transform:uppercase}
+.mc-v{font-size:11px;font-weight:500;color:var(--t)}
+.pdesc{font-size:11px;color:var(--ts);line-height:1.55}
+.expand-section{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(0.22,1,0.36,1)}
+.panel.expanded .expand-section{max-height:260px}
+.exp-divider{height:0.5px;background:var(--b);margin:10px 0}
+.exp-block{margin-bottom:10px}
+.exp-label{font-size:9px;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.visit-history{background:var(--surf);border:0.5px solid var(--b);border-radius:8px;padding:7px 9px}
+.visit-row{display:flex;justify-content:space-between;font-size:10px;padding:2px 0}
+.note-box{background:var(--surf);border:0.5px solid var(--b);border-left:2px solid var(--blue);border-radius:0 8px 8px 0;padding:7px 9px;font-size:10px;color:var(--ts);font-style:italic;line-height:1.5}
+.source-row{font-size:9px;color:var(--tm);line-height:1.5}
+.expand-btn{width:100%;background:rgba(14,165,233,.08);border:0.5px solid rgba(14,165,233,.25);border-radius:8px;padding:7px;font-size:10px;font-weight:500;color:var(--blue);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;margin-top:2px}
+.expand-btn i{transition:transform .3s;font-size:12px}
+.panel.expanded .expand-btn i{transform:rotate(180deg)}
+.searchwrap{flex:1;position:relative}
+.searchbox.ai-mode{border-color:rgba(16,185,129,.5);background:rgba(16,185,129,.08)}
+.mode-pill{font-size:9px;padding:4px 10px;border-radius:999px;background:rgba(16,185,129,.12);color:#34d399;border:0.5px solid rgba(16,185,129,.3);display:flex;align-items:center;gap:4px;flex-shrink:0}
+.route-svg{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.route-path{fill:none;stroke:var(--green);stroke-width:1.5;stroke-dasharray:5,4;opacity:.65}
+.panel-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--tm);font-size:11px;gap:8px;padding:20px;text-align:center}
+.isl-hdr{padding:14px;border-bottom:0.5px solid var(--b)}
+.isl-name{font-size:15px;font-weight:600;color:var(--t);margin-bottom:1px}
+.isl-count{font-size:10px;color:var(--tm)}
+.isl-body{padding:14px}
+.isl-sec-lbl{font-size:9px;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.month-row{display:flex;gap:2px;margin-bottom:12px}
+.month-pill{flex:1;text-align:center;font-size:8px;padding:5px 0;border-radius:4px;background:var(--surf);border:0.5px solid var(--b);color:var(--tm);font-weight:500}
+.month-pill.rain{background:rgba(56,189,248,.18);border-color:rgba(56,189,248,.4);color:#38bdf8}
+.month-pill.dry{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.35);color:#fbbf24}
+.month-pill.close{background:rgba(239,68,68,.22);border-color:rgba(239,68,68,.45);color:#f87171}
+.isl-legend{display:flex;gap:10px;margin-bottom:6px}
+.isl-legend-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--ts)}
+.isl-dot{width:7px;height:7px;border-radius:2px}
+.isl-dot.rain{background:#38bdf8}.isl-dot.dry{background:#fbbf24}.isl-dot.close{background:#ef4444}
+.wild-list{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.wild-item{background:var(--surf);border:0.5px solid var(--b);border-radius:8px;padding:7px 9px;font-size:10px;color:var(--ts);line-height:1.5}
+.isl-empty-note{font-size:9px;color:var(--tm);font-style:italic;padding:8px 0}
+.isl-hint{font-size:9px;color:var(--tm);text-align:center;padding:10px 14px;border-top:0.5px solid var(--b)}
+.back-to-isl{font-size:10px;color:var(--blue);padding:8px 14px;cursor:pointer;border-bottom:0.5px solid var(--b);flex-shrink:0}
+.back-to-isl:hover{background:var(--hover)}
+.dive-mk .ring.itin{background:var(--green);border-color:#04342c;color:#04342c;font-family:'DM Mono',monospace;font-weight:600}
+.dive-mk.itin .lbl{opacity:1}
+.chat-hdr{padding:10px 12px;border-bottom:0.5px solid var(--b);font-size:10px;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.chat-body{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:90%;padding:7px 10px;border-radius:10px;font-size:10.5px;line-height:1.5;opacity:0;transform:translateY(6px);animation:in .3s ease forwards}
+@keyframes in{to{opacity:1;transform:translateY(0)}}
+.bubble.ai{background:var(--surf);border:0.5px solid var(--b);color:var(--t);align-self:flex-start}
+.bubble.user{background:rgba(14,165,233,.15);border:0.5px solid rgba(14,165,233,.3);color:var(--t);align-self:flex-end}
+.chips{display:flex;gap:5px;flex-wrap:wrap;align-self:flex-start;max-width:95%}
+.chip{font-size:9px;padding:5px 10px;border-radius:999px;background:var(--surf);border:0.5px solid var(--b);color:var(--ts);cursor:pointer}
+.chip:hover{border-color:var(--blue);color:var(--t)}
+.thinking{align-self:flex-start;display:flex;gap:4px;padding:6px 10px}
+.dot{width:4px;height:4px;border-radius:50%;background:var(--tm);animation:pulse 1.2s ease infinite}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,60%,100%{opacity:.3}30%{opacity:1}}
+.panel.itin-open{width:280px}
+.itin-scroll{flex:1;overflow-y:auto}
+.itin-hdr{padding:12px;background:linear-gradient(135deg, rgba(56,189,248,.06), rgba(16,185,129,.06));border-bottom:0.5px solid var(--b)}
+.itin-tag{font-size:9px;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.itin-ttl{font-size:12px;font-weight:500;color:var(--t);margin-bottom:8px;line-height:1.4}
+.itin-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.itin-meta-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--ts)}
+.itin-match{display:flex;gap:5px;flex-wrap:wrap;padding-top:8px;border-top:0.5px solid rgba(255,255,255,.06)}
+.itin-match-tag{font-size:8px;padding:2px 7px;border-radius:99px;background:rgba(16,185,129,.12);color:#34d399;border:0.5px solid rgba(16,185,129,.25)}
+.itin-note{margin:10px;background:rgba(245,158,11,.06);border:0.5px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 9px;font-size:9px;color:var(--ts);line-height:1.6}
+.itin-days{padding:10px}
+.itin-day{position:relative;padding-left:16px;padding-bottom:10px;cursor:pointer}
+.itin-day:last-child{padding-bottom:0}
+.itin-day::before{content:'';position:absolute;left:4px;top:16px;bottom:-2px;width:0.5px;background:var(--b)}
+.itin-day:last-child::before{display:none}
+.itin-day-dot{position:absolute;left:0;top:3px;width:9px;height:9px;border-radius:50%;background:var(--card);border:2px solid var(--blue)}
+.itin-day-dot.sel{background:var(--green);border-color:var(--green)}
+.itin-day-hdr{display:flex;align-items:center;gap:5px;margin-bottom:6px;font-size:9px;flex-wrap:wrap}
+.itin-day-num{color:var(--tm);text-transform:uppercase}
+.itin-day-date{color:var(--t);font-weight:500;font-size:10.5px}
+.itin-day-badge{font-size:7px;padding:1px 6px;border-radius:99px;background:rgba(16,185,129,.12);color:#34d399;border:0.5px solid rgba(16,185,129,.25)}
+.mini-site{background:var(--surf);border:0.5px solid var(--b);border-radius:8px;padding:7px 8px;margin-bottom:4px}
+.mini-site.sel{border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.05)}
+.mini-site-name{font-size:10.5px;font-weight:500;color:var(--t)}
+.mini-site-tags{display:flex;gap:3px;flex-wrap:wrap;margin:3px 0}
+.mini-tag{font-size:8px;padding:1px 5px;border-radius:3px;border:0.5px solid}
+.mini-desc{font-size:9px;color:var(--ts);line-height:1.5}
+.transport-mini{background:rgba(245,158,11,.06);border:0.5px solid rgba(245,158,11,.2);border-radius:8px;padding:6px 8px;margin-bottom:4px;display:flex;flex-direction:column;gap:2px}
+.transport-mini-text{font-size:9px;color:var(--ts);display:flex;align-items:center;gap:4px}
+.transport-mini-price{font-size:9.5px;font-weight:500;color:var(--amber);font-family:'DM Mono',monospace}
+.rest-mini{font-size:8.5px;color:var(--tm);font-style:italic;padding:2px 0 4px}
+.budget-box{padding:10px;background:rgba(255,255,255,.02);border-top:0.5px solid var(--b)}
+.budget-ttl{font-size:9px;color:var(--tm);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.budget-row{display:flex;justify-content:space-between;font-size:9.5px;color:var(--ts);padding:3px 0;border-bottom:0.5px solid rgba(255,255,255,.04)}
+.budget-total{display:flex;justify-content:space-between;padding-top:8px;margin-top:5px;border-top:0.5px solid var(--b)}
+.budget-total-label{font-size:10.5px;font-weight:500;color:var(--t)}
+.budget-total-val{font-size:13px;font-weight:500;color:var(--amber);font-family:'DM Mono',monospace}
+.itin-caveat{padding:10px 10px 12px;font-size:8.5px;color:var(--tm);line-height:1.5;display:flex;gap:5px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo">Dive<span>Map</span></div>
+    <div class="searchwrap">
+      <div class="searchbox" id="searchbox"><span style="font-size:12px;color:var(--tm)" id="search-icon">🔍</span><input id="sq" placeholder="搜尋國家、島嶼、潛點，或打「我想看海龜」試試 AI"></div>
+    </div>
+    <div class="mode-pill" id="mode-pill" style="display:none">🧭 行程模式<span style="cursor:pointer;margin-left:2px" id="exit-itin">✕</span></div>
+    <div class="ib on">🌧️</div>
+    <div class="ib" onclick="goLevel('world')">🌐</div>
+  </div>
+  <div class="bc" id="bc"></div>
+  <div class="body">
+    <div class="sidebar" id="sb"><div class="sb-inner">
+      <div class="sb-hdr"><span class="sb-ttl" id="sb-ttl">國家</span><span class="sb-close" onclick="toggleSb(false)">‹</span></div>
+      <div class="sb-list" id="sb-list"></div>
+    </div></div>
+    <div class="sb-peek" id="sb-peek" onclick="toggleSb(true)">›</div>
+    <div class="map-wrap" id="map-wrap">
+      <div id="leaflet-map" style="position:absolute;inset:0"></div>
+      <div class="wx-card" id="wx-card"></div>
+      <div class="map-ctrl"><div class="ib" onclick="zoomBy(1.3)">+</div><div class="ib" onclick="zoomBy(0.77)">−</div></div>
+      <div class="stats"><span class="st-v" id="stats-text">世界地圖 · 154 個已驗證潛點</span></div>
+    </div>
+    <div class="panel-peek hidden" id="panel-peek" onclick="togglePanel(true)">‹</div>
+    <div class="panel" id="panel"><div class="panel-empty">點選潛點看詳情，或在上方打字試試 AI 規劃</div></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var COUNTRIES=[
+  {id:'id',name:'印尼',lat:-2,lng:118,color:'#0ea5e9',sites:197,visited:0},
+  {id:'ph',name:'菲律賓',lat:12,lng:122,color:'#f59e0b',sites:40,visited:0},
+  {id:'my',name:'馬來西亞',lat:4,lng:114,color:'#10b981',sites:84,visited:2},
+  {id:'th',name:'泰國',lat:8,lng:99,color:'#a78bfa',sites:20,visited:0},
+  {id:'mv',name:'馬爾地夫',lat:3,lng:73,color:'#f472b6',sites:20,visited:0},
+  {id:'au',name:'澳大利亞',lat:-22,lng:133,color:'#fb923c',sites:39,visited:0},
+  {id:'tw',name:'台灣',lat:23.5,lng:121,color:'#22d3ee',sites:26,visited:0},
+  {id:'ec',name:'厄瓜多',lat:-0.5,lng:-90,color:'#f87171',sites:0,visited:0},
+  {id:'jp',name:'日本',lat:24.5,lng:124.5,color:'#818cf8',sites:11,visited:0},
+  {id:'pw',name:'帛琉',lat:7.3,lng:134.48,color:'#34d399',sites:12,visited:0},
+  {id:'vn',name:'越南',lat:14,lng:108.5,color:'#fbbf24',sites:8,visited:0},
+  {id:'lk',name:'斯里蘭卡',lat:7.5,lng:80.7,color:'#f97316',sites:8,visited:0},
+  {id:'mm',name:'緬甸',lat:11,lng:98,color:'#a3a3a3',sites:5,visited:0},
+  {id:'in',name:'印度（安達曼群島）',lat:11.9,lng:93,color:'#fb7185',sites:8,visited:0}
+];
+var ISLANDS={
+  my:[
+    {id:'tioman',name:'刁曼島',lat:2.85,lng:104.1,wxT:26.7,wxR:35},
+    {id:'sipadan',name:'西巴丹',lat:4.1167,lng:118.6333,wxT:28.3,wxR:60,rainy:[11,12,1,2,3],dry:[4,5,6,7,8,9,10],closure:[11],wildlife:'海龜：全年。鯊魚：全年，錘頭鯊 4-6月機率較高。'},
+    {id:'mabul',name:'馬布島',lat:4.2333,lng:118.6167,wxT:28.3,wxR:60},
+    {id:'kapalai',name:'卡帕來',lat:4.2258,lng:118.6852,wxT:28.3,wxR:60},
+    {id:'perhentian',name:'停泊島',lat:5.9083,lng:102.7083,wxT:28,wxR:20,rainy:[11,12,1,2,3,4],dry:[5,6,7,8,9,10],wildlife:'鯨鯊：偶遇。海龜：全年常見。'},
+    {id:'redang',name:'熱浪島',lat:5.7833,lng:103,wxT:28,wxR:20,rainy:[11,12,1,2],dry:[3,4,5,6,7,8,9,10]},
+    {id:'langtengah',name:'浪中島',lat:5.7833,lng:102.9167,wxT:28,wxR:20,rainy:[11,12,1,2],dry:[3,4,5,6,7,8,9,10]},
+    {id:'layanglayang',name:'拉央拉央環礁',lat:7.3667,lng:113.8333,wxT:28,wxR:40,rainy:[11,12,1,2],dry:[3,4,5,6,7,8,9,10],wildlife:'錘頭鯊：4-5月交配季群聚，機率最高。全年可能零星遇見。'}
+  ],
+  id:[
+    {id:'tulamben',name:'圖蘭本',lat:-8.285,lng:115.595,wxT:26.2,wxR:35},
+    {id:'amed',name:'艾湄灣',lat:-8.335,lng:115.675,wxT:26.2,wxR:35},
+    {id:'komodonw',name:'西北科莫多',lat:-8.5,lng:119.71,wxT:24,wxR:20},
+    {id:'komodocentral',name:'科莫多中部群島',lat:-8.53,lng:119.82,wxT:24,wxR:20},
+    {id:'rinca',name:'林卡島與南部',lat:-8.78,lng:119.68,wxT:23.5,wxR:20},
+    {id:'gili',name:'吉利群島',lat:-8.35,lng:116.04,wxT:27.5,wxR:30},
+    {id:'lembeh',name:'藍碧海峽',lat:1.45,lng:125.22,wxT:27.8,wxR:55},
+    {id:'bunaken',name:'布納肯',lat:1.6186,lng:124.7624,wxT:28.3,wxR:50,rainy:[11,12,1,2,3,4],dry:[5,6,7,8,9,10],wildlife:'海龜：全年常見於勒庫安一帶。鯊魚：麥克角水流強勁時偶有機會遇見。'},
+    {id:'alor',name:'阿洛群島',lat:-8.2217,lng:124.5416,wxT:26,wxR:40,rainy:[12,1,2,3],dry:[6,7,8,9,10],wildlife:'錘頭鯊：9-11月水流最強時於慕納瑞利機率較高。鯊魚：全年常見。'},
+    {id:'maumere',name:'莫米爾灣',lat:-8.6222,lng:122.2122,wxT:27,wxR:20,rainy:[11,12,1,2,3],dry:[4,5,6,7,8,9,10],wildlife:'海龜：巴比島、貝薩爾島全年常見。鯨鯊/抹香鯨：偶遇，4-5月機率較高。'},
+    {id:'dampier',name:'丹皮爾海峽',lat:-0.25,lng:130.4,wxT:28,wxR:30,rainy:[5,6,7,8,9],dry:[10,11,1,2,3,4],wildlife:'蝠鲼：蝠鲼嶺全年穩定清潔站。大型魚群：克里角全年常見。'},
+    {id:'misool',name:'米蘇爾',lat:-2.1,lng:130.35,wxT:28,wxR:27,rainy:[5,6,7,8,9],dry:[10,11,1,2,3,4],wildlife:'錘頭鯊：尖峰(The Pinnacles)7-9月晨潛機率較高。大型魚群全年可見。'},
+    {id:'triton',name:'塔蘭灣',lat:-3.87,lng:134.15,wxT:27,wxR:15,rainy:[6,7,8,9],dry:[10,11,1,2,3,4],wildlife:'步行鯊、軟珊瑚花園全年常見。'},
+    {id:'kubu',name:'庫布',lat:-8.25,lng:115.56,wxT:27.5,wxR:20,rainy:[11,12,1,2],dry:[4,5,6,7,8,9,10]},
+    {id:'penida',name:'佩尼達島與藍夢島',lat:-8.73,lng:115.55,wxT:24,wxR:25,wildlife:'蝠鲼：全年可見，8月最佳，蝠鲼灣為穩定清潔站。翻車魚：7-11月，水晶灣為核心觀測點。'},
+    {id:'ambon',name:'安汶',lat:-3.65,lng:128.18,wxT:28,wxR:15,rainy:[6,7,8],dry:[9,10,11],wildlife:'迷幻蛙魚：全球唯一棲息地，全年可見但密度極低。'},
+    {id:'derawan',name:'達拉灣群島',lat:2.28,lng:118.24,wxT:28,wxR:25,rainy:[11,12,1,2],dry:[3,4,5,6,7,8,9,10],wildlife:'蝠鲼：桑吉蘭清潔站全年穩定，漲潮期最佳。水母：卡卡班湖全日可見。'},
+    {id:'cenderawasih',name:'森達拉瓦西灣',lat:-3.1,lng:134.51,wxT:28,wxR:15,rainy:[12,1,2,3,4],dry:[5,6,7,8,9,10,11],wildlife:'鯨鯊：全年可見，8-10月機率最高，漁民傳統餵食觀察。'},
+    {id:'kofiau',name:'科菲阿群島',lat:-1.2,lng:129.85,wxT:28,wxR:25,rainy:[5,6,7,8,9],dry:[10,11,1,2,3,4],wildlife:'單次潛水曾發現284種魚類，世界紀錄。岸外偶遇大型鯨豚類。'}
+  ],
+  mv:[
+    {id:'male',name:'男性島',lat:4.1883,lng:73.5242,wxT:27.9,wxR:30},
+    {id:'thoddoo',name:'碩道島',lat:4.4368,lng:72.9591,wxT:27.9,wxR:30},
+    {id:'moofushi',name:'穆富西島',lat:3.885,lng:72.7269,wxT:27.9,wxR:30},
+    {id:'dhangethi',name:'達安格提島',lat:3.6042,lng:72.9597,wxT:27.9,wxR:30},
+    {id:'felidhoo',name:'菲利圖島',lat:3.4718,lng:73.547,wxT:27.9,wxR:30},
+    {id:'addu',name:'阿杜環礁',lat:-0.6,lng:73.1,wxT:28,wxR:25,wildlife:'蝠鲼：全年可見，2-4月及9-11月為高峰期。'},
+    {id:'raa',name:'拉阿環礁',lat:5.55,lng:72.93,wxT:28,wxR:22,wildlife:'鯊魚、海龜全年可見，11-4月為最佳造訪季節。'},
+    {id:'noonu',name:'諾努環礁',lat:5.85,lng:73.32,wxT:28,wxR:25,wildlife:'鯊魚全年常見，夜潛首選旱季。'},
+    {id:'northmale',name:'北馬累環礁',lat:4.17,lng:73.53,wxT:28,wxR:25,wildlife:'蝠鲼：蝠鲼角全年可見清潔站。'},
+    {id:'fuvahmulah',name:'富瓦穆拉環礁',lat:-0.3,lng:73.42,wxT:28,wxR:25,wildlife:'虎鯊：全球唯一全年穩定觀測點。長尾鯊全年，1-3月錘頭鯊交配季。'},
+    {id:'ari',name:'阿里環礁',lat:3.83,lng:72.83,wxT:28,wxR:22,wildlife:'錘頭鯊：1-4月。鯨鯊：8-11月。'},
+    {id:'huvadhu',name:'胡瓦杜環礁',lat:0.45,lng:73.3,wxT:28,wxR:25,wildlife:'鯊魚全年常見，蝠鲼清潔站1-4月及8-10月最佳。'},
+    {id:'haaalifu',name:'伊哈萬德希波爾胡環礁',lat:7.1,lng:72.85,wxT:28,wxR:30,wildlife:'蝠鲼、海龜全年可見，11-4月能見度最佳。'},
+    {id:'southmale',name:'南馬累環礁',lat:3.93,lng:73.5,wxT:28,wxR:22,wildlife:'鯊魚、海狼群全年可見，4-9月洋流平穩期最佳。'},
+    {id:'baa',name:'芭環礁',lat:5.25,lng:73.07,wxT:28,wxR:18,wildlife:'蝠鲼風暴：5-11月西南季風期，哈尼法魯灣可見數十隻蝠鲼同游，偶有鯨鯊。'}
+  ],
+  ph:[
+    {id:'anilao',name:'阿尼洛',lat:13.74,lng:120.91,wxT:28,wxR:15,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5]},
+    {id:'subicbay',name:'蘇比克灣',lat:14.79,lng:120.27,wxT:28,wxR:10,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5]},
+    {id:'aporeef',name:'阿波礁',lat:12.65,lng:120.45,wxT:28,wxR:25,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5]},
+    {id:'coron',name:'科隆',lat:12,lng:120.2,wxT:28,wxR:20,rainy:[6,7,8,9],dry:[10,11,12,1,2,3,4,5]},
+    {id:'moalboal',name:'墨寶',lat:9.96,lng:123.4,wxT:28,wxR:15,wildlife:'沙丁魚風暴：岸潛全年可見的百萬級魚群旋渦。'},
+    {id:'bohol',name:'薄荷島',lat:9.52,lng:123.69,wxT:28,wxR:20,wildlife:'鯨鯊：偶遇。海龜：全年常見於巴里卡薩島。'},
+    {id:'tubbataha',name:'圖巴塔哈',lat:8.85,lng:119.92,wxT:28,wxR:30,rainy:[7,8,9,10,11,12,1,2],dry:[3,4,5,6],closure:[7,8,9,10,11,12,1,2],wildlife:'僅3-6月開放船宿。鯊魚、海龜全年可見。'},
+    {id:'apoisland',name:'阿波島',lat:9.07,lng:123.27,wxT:28,wxR:25,wildlife:'海龜：常駐約200隻綠蠵龜，全年可見。'},
+    {id:'elnido',name:'愛妮島',lat:11.18,lng:119.4,wxT:28,wxR:25,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5]},
+    {id:'puertogalera',name:'海豚灣',lat:13.5,lng:120.95,wxT:28,wxR:18,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5]},
+    {id:'oslob',name:'奧斯洛布',lat:9.46,lng:123.42,wxT:28,wxR:12,wildlife:'鯨鯊：全年可見（互動投餵點，生態爭議請理性選擇）。'},
+    {id:'malapascua',name:'媽媽拍絲瓜島',lat:11.33,lng:124.12,wxT:28,wxR:18,wildlife:'長尾鯊：全球唯一穩定觀測點，全年清晨可見。'}
+  ],
+  tw:[
+    {id:'kenting',name:'墾丁',lat:21.95,lng:120.79,wxT:27,wxR:15,rainy:[6,7,8,9],dry:[10,11,12,1,2,3,4,5],wildlife:'珊瑚礁魚類全年常見，海況全年適合潛水。'},
+    {id:'greenisland',name:'綠島',lat:22.66,lng:121.49,wxT:26,wxR:25,rainy:[10,11,12,1,2,3],dry:[4,5,6,7,8,9],wildlife:'海龜：全年高頻率目擊。錘頭鯊：3月機率較高。'},
+    {id:'orchidisland',name:'蘭嶼',lat:22.05,lng:121.55,wxT:26,wxR:25,rainy:[10,11,12,1,2,3],dry:[4,5,6,7,8,9],wildlife:'海龜全年常見，受黑潮影響能見度佳。10月-次年3月航班停航。'},
+    {id:'xiaoliuqiu',name:'小琉球',lat:22.3406,lng:120.3728,wxT:25,wxR:20,wildlife:'海龜：全年高密度目擊，以綠蠵龜為主，是台灣海龜密度最高的地點。'},
+    {id:'northeastcoast',name:'東北角',lat:25.1128,lng:121.9159,wxT:22,wxR:8,rainy:[11,12,1,2,3,4],dry:[5,6,7,8,9,10],wildlife:'微距生物全年可見，號稱「微距天堂」，夏季物種最豐富。'},
+    {id:'penghu',name:'澎湖',lat:23.5667,lng:119.5833,wxT:26,wxR:15,rainy:[11,12,1,2,3],dry:[4,5,6,7,8,9,10],wildlife:'紫色珊瑚：東吉嶼薰衣草森林全年可見。全年強風日數高，適合潛水的日子不多。'}
+  ],
+  jp:[
+    {id:'ishigaki',name:'石垣島',lat:24.3448,lng:124.1572,wxT:26,wxR:20,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5],wildlife:'蝠鲼：5-11月為主，9-11月目擊率最高。'},
+    {id:'miyako',name:'宮古島',lat:24.8057,lng:125.2811,wxT:25,wxR:18,rainy:[6,7,8,9,10],dry:[11,12,1,2,3,4,5],wildlife:'地形潛點9-11月海況穩定，Yabiji潛點群4-8月最佳。'},
+    {id:'okinawamain',name:'沖繩本島',lat:26.5,lng:127.86,wxT:24,wxR:18,rainy:[6,7,8,9],dry:[10,11,4,5],wildlife:'海龜：慶良間諸島全年常見。'}
+  ],
+  au:[
+    {id:'northgbr',name:'北部大堡礁',lat:-15.5,lng:146,wxT:27,wxR:20,rainy:[1,2,3,4,5],dry:[6,7,8,9,10,11,12],wildlife:'錘頭鯊：魚鷹礁北角全年可見。侏儒小鬚鯨：6-7月。'},
+    {id:'centralgbr',name:'中部大堡礁',lat:-19.2,lng:147.5,wxT:25,wxR:20,rainy:[1,2,3],dry:[4,5,6,7,8,9],wildlife:'海龜、鯊魚、蝠鲼：揚加拉號沉船全年常見。'},
+    {id:'southgbr',name:'南部大堡礁',lat:-23.5,lng:152.5,wxT:24,wxR:15,wildlife:'蝠鲼：冬季6-8月為主。海龜：夏季11-3月築巢。'},
+    {id:'stradbroke',name:'布里斯班 Stradbroke Island',lat:-27.5,lng:153.5,wxT:22,wxR:15,wildlife:'蝠鲼：溫暖月份於曼塔礁石聚集。'},
+    {id:'ningaloo',name:'寧格魯 Ningaloo',lat:-22.5,lng:113.8,wxT:25,wxR:10,wildlife:'鯨鯊：3月中旬-7月下旬。蝠鲼：5-11月。座頭鯨：6-11月。'},
+    {id:'rowleyshoals',name:'羅利淺灘 Rowley Shoals',lat:-17.5,lng:119.4,wxT:26,wxR:10,wildlife:'鯨鯊、蝠鲼、鯊魚、錘頭鯊：9-11月唯一可到訪窗口。'},
+    {id:'christmasisland',name:'聖誕島 Christmas Island',lat:-10.49,lng:105.63,wxT:27,wxR:20,wildlife:'紅蟹遷徙：陸地奇觀，全年受熱帶氣候影響。10月-4月為最佳潛季。'},
+    {id:'cocosislands',name:'科科斯基林群島 Cocos Islands',lat:-12.19,lng:96.83,wxT:27,wxR:15,wildlife:'蝠鲼、鯊魚、海龜：4-11月旺季能見度最佳。'},
+    {id:'portlincoln',name:'林肯港 Port Lincoln',lat:-34.7,lng:135.8,wxT:18,wxR:10,wildlife:'大白鯊：12-2月夏季最活躍，海王星群島籠潛全年可行。'},
+    {id:'whyalla',name:'懷阿拉 Whyalla',lat:-33.03,lng:137.58,wxT:16,wxR:10,wildlife:'巨型烏賊：5-8月冬季產卵聚集，全球最大規模烏賊聚集地之一。'},
+    {id:'mtgambier',name:'甘比爾山 Mount Gambier',lat:-37.83,lng:140.78,wxT:15,wxR:10,wildlife:'淡水天坑，全年不受季節影響，能見度常年極佳。'},
+    {id:'lordhowe',name:'豪勳爵島 Lord Howe Island',lat:-31.55,lng:159.08,wxT:20,wxR:15,wildlife:'地球最南端珊瑚礁，9月至次年5月為潛水季，島上限400人。'},
+    {id:'jervisbay',name:'傑維斯灣 Jervis Bay',lat:-35,lng:150.8,wxT:19,wxR:12,wildlife:'全年能見度15-20米，微距生物與海豹全年常見。'},
+    {id:'southwestrocks',name:'西南岩石 South West Rocks',lat:-30.88,lng:152.96,wxT:21,wxR:12,wildlife:'灰護士鯊：全年常見。巨型烏賊：9-10月洞穴周圍產卵。'},
+    {id:'byronbay',name:'拜倫灣 Byron Bay',lat:-28.65,lng:153.61,wxT:22,wxR:15,wildlife:'灰護士鯊：冬季。豹鯊/蝠鲼：夏季。座頭鯨遷徙：5-9月。'},
+    {id:'merimbula',name:'梅林布拉 Merimbula',lat:-36.89,lng:149.91,wxT:18,wxR:12,wildlife:'翻車魚與座頭鯨：冬季常見，全年皆可潛水沉船。'}
+  ],
+  th:[
+    {id:'phuket',name:'普吉島',lat:7.88,lng:98.4,wxT:29,wxR:15,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'蝠鲼、鯨鯊：不定期出沒，全年可能遇見。'},
+    {id:'kohtao',name:'涵尾島 Koh Tao',lat:10.1,lng:99.83,wxT:29,wxR:15,rainy:[10,11],dry:[5,6,7,8,9],wildlife:'鯨鯊：3-6月旺季。全球性價比最高OW考證地。'},
+    {id:'krabiphiphi',name:'甲米與皮皮島',lat:7.74,lng:98.78,wxT:29,wxR:15,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'豹紋鯊：全年常見。大型魚類、蝠鲼不定期出沒。'},
+    {id:'khaolaksimilan',name:'考拉克與斯米蘭群島',lat:8.55,lng:97.65,wxT:29,wxR:10,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'鯨鯊：3-6月。蝠鲼：全年可能。國家公園僅11/1-5/15開放。'},
+    {id:'kohlipe',name:'麗貝島',lat:6.49,lng:99.3,wxT:29,wxR:15,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'長尾鯊：清晨常見。大型海洋哺乳類動物：幸運可見。'}
+  ],
+  pw:[
+    {id:'rockislands',name:'洛克群島（科羅）',lat:7.25,lng:134.3,wxT:28,wxR:20,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'鯊魚：藍角全年可見。蝠鲼：德國水道清潔站季節性強。金黃水母：水母湖（僅浮潛，近年數量銳減）。'},
+    {id:'peleliu',name:'貝里琉島',lat:7,lng:134.23,wxT:28,wxR:20,rainy:[5,6,7,8,9,10],dry:[11,12,1,2,3,4],wildlife:'鯊魚、大型魚群：全年可見，10月-次年5月海況較穩。'}
+  ],
+  vn:[
+    {id:'nhatrang',name:'芽莊（朋島）',lat:12.17,lng:109.258,wxT:27,wxR:20,wildlife:'海龜、竹鯊：全年常見。2-10月為潛水季，7-8月能見度最佳。'},
+    {id:'condao',name:'崑島',lat:8.69,lng:106.61,wxT:28,wxR:20,wildlife:'綠海龜：4-9月產卵季，5月底-7月為高峰。大型海洋哺乳類動物：偶遇。'}
+  ],
+  lk:[
+    {id:'unawatuna',name:'烏納瓦圖納',lat:6.0183,lng:80.2525,wxT:28,wxR:20,rainy:[5,6,7,8,9],dry:[11,12,1,2,3,4],wildlife:'各式熱帶魚：全年常見。11-4月為西南季風潛季。'},
+    {id:'trincomalee',name:'亭可馬里',lat:8.5874,lng:81.2152,wxT:28,wxR:20,rainy:[11,12,1,2,3],dry:[5,6,7,8,9,10],wildlife:'鯨魚：3-4月機率較高。海龜、小型鯊魚：全年常見。5-10月為東北季風潛季。'}
+  ],
+  mm:[
+    {id:'mergui',name:'丹老群島',lat:11,lng:98,wxT:29,wxR:15,dry:[11,12,1,2,3,4],wildlife:'鯊魚、蝠鲼：全年常見。大部分潛點僅11-4月開放，需搭船宿前往。'}
+  ],
+  in:[
+    {id:'havelock',name:'哈維洛克島',lat:11.96,lng:93,wxT:28,wxR:20,dry:[11,12,1,2,3,4,5],wildlife:'大型魚群：全年常見。11月-次年5月為主要潛季。'},
+    {id:'neil',name:'尼爾島',lat:11.83,lng:93.04,wxT:28,wxR:20,dry:[11,12,1,2,3,4,5],wildlife:'海中哺乳類動物：偶遇。11月-次年5月為主要潛季。'}
+  ]
+};
+var ROUTES={
+  mv:[
+    {id:'fourcorners',name:'四方線 Four Corners Route',operator:'Prince Ulua',days:5,
+      stops:[
+        {islandId:'male',label:'登船'},
+        {islandId:'thoddoo',label:''},
+        {islandId:'moofushi',label:''},
+        {islandId:'dhangethi',label:''},
+        {islandId:'felidhoo',label:'返航'}
+      ]}
+  ]
+};
+function S(name,lat,lng,diff,wild,conf,desc,extra){var o={name:name,lat:lat,lng:lng,diff:diff,wild:wild||'',conf:conf,desc:desc};if(extra)Object.assign(o,extra);return o;}
+var SITES={
+  tioman:[
+    S('Tiger Reef',2.8907,104.0603,'中級','海龜、鯊魚','high','刁曼島著名硬珊瑚礁水下尖礁，位於 Sepoi 島與 Labas 島之間，深度 10-22m，常見海龜、白鰭鯊。',{visited:true,visitDates:['2026-03-14'],note:'看到超多石斑跟一隻懶洋洋的海龜，流不算太強，很舒服的一潛。',source:'divezone.net（內嵌地圖連結）',depth:'10-22m',current:'強'}),
+    S('Renggis Island',2.8119,104.1332,'初級','海龜','high','鄰近 Tekek 村的小島，水域平緩，是刁曼島夜潛首選，也適合初學者訓練。',{source:'divezone.net（內嵌地圖連結）',depth:'6-18m',current:'弱'}),
+    S('Soyak Wreck',2.8759,104.1478,'初級','','high','位於 Salang 海域，兩艘泰式漁船沉於 22-30 公尺深處，船體覆蓋軟硬珊瑚。',{source:'divezone.net（內嵌地圖連結）',depth:'22-30m'}),
+    S('Chebeh Island',2.9324,104.1025,'中級','','high','刁曼島北方離岸島，花崗岩巨石地形形成許多洞穴與通道，洋流可能強勁。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Magicienne Rock',2.9169,104.1483,'高級','海龜、鯊魚','high','刁曼島最刺激潛點之一，強流帶來豐富海洋生物，幸運時可見鯨鯊。',{source:'divezone.net（內嵌地圖連結）',current:'強'}),
+    S('Pulau Labas',2.8865,104.0631,'高級','鯊魚','high','形狀如瑞士乳酪佈滿洞穴，大型花崗岩堆疊形成寬廣通道網絡。',{source:'divezone.net + 3 張潛水地圖交叉比對'}),
+    S('Malang Rock',2.9041,104.1198,'中級','','medium','刁曼島熱門潛點，強勁洋流帶來豐富養分，吸引大量魚群。',{visited:true,visitDates:['2026-01-20','2025-11-08'],note:'魚群密度真的驚人，但流有點強，記得帶反鉤。',source:'divezone.net（座標格式異常，待複查）',current:'強'}),
+    S('Kador Bay',2.92,104.15,'中級','','low','珊瑚豐富、生態多樣的潛點，沙質平底約 22 公尺深。',{source:'依三張地圖相對位置修正'}),
+    S('Sepoi Island',2.895,104.058,'高級','','low','虎礁與拉巴斯島附近的離岸島，經常被一併提及。',{source:'估算，無專屬頁面'}),
+    S('Golden Reef',2.89,104.055,'中級','','low','刁曼島熱門潛點之一，常與虎礁一起被提及。',{source:'估算，無專屬頁面'}),
+    S('Fan Canyon',2.918114,104.120464,'高級','','high','由數塊巨大花崗岩構成的峽谷地形，岩塊間的狹窄水道長滿大片海扇，是水下攝影的熱門地點之一。',{source:'divezone.net（內嵌地圖連結）',depth:'10-30m',current:'弱'}),
+    S('Bahara Rocks',2.664217,104.064033,'高級','鯊魚','high','位於西南角的岩牆潛點，大型魚群豐富，常見小型鯊魚出沒。',{source:'divezone.net（內嵌地圖連結）',depth:'10-25m',current:'中等'}),
+    S('Tulai Island',2.919933,104.103883,'初級','','high','又稱「珊瑚島」，位於東北側，以大片白沙與健康硬珊瑚聞名，適合長時間悠閒潛水與浮潛。',{source:'divezone.net（內嵌地圖連結）',depth:'10-25m',current:'弱'}),
+    S('Pirate Reef',2.8,104.15,'初級','','low','兩大魚類繁殖場之一，3-5月孵化季會出現大量幼魚，夜潛偶爾能見小型竹鯊。',{source:'潛店官網描述交叉比對，依方位估算',depth:'4-14m',current:'弱'}),
+    S('North Point',2.95,104.17,'中級','','low','沿主島北側的漂流潛點，地形從珊瑚圓丘緩降至花崗巨石區，軟珊瑚間常見獅子魚與大型鸚哥魚。',{source:'潛店官網描述交叉比對，依方位估算',depth:'6-18m',current:'中等'}),
+    S('Sawadee Wreck',2.82,104.16,'高級','','low','主島附近最深的沉船潛點，常作為進階開放水域深潛訓練地點，吸引大量魚群聚集。',{source:'潛店官網描述交叉比對，依方位估算',depth:'18-30m',current:'弱'}),
+    S('LRT Artificial Reef',2.83,104.155,'中級','','low','馬來西亞獨一無二的人工魚礁，由退役輕軌列車車廂沉放組成，車廂已逐漸成為魚群棲息地，是當地最特別的潛點之一。',{source:'潛店官網描述交叉比對，依方位估算',depth:'10-20m',current:'弱'}),
+    S('Batu Jahat',2.7,104.12,'高級','','low','位於最南端的小型岩礁，是尋找多種微距生物的熱點，同時也有健康的珊瑚覆蓋。',{source:'潛店官網描述交叉比對，依方位估算',depth:'25m',current:'中等'})
+  ],
+  sipadan:[
+    S('South Point',4.1033,118.6341,'高級','','high','西巴丹南端，深度 25-40m，適合進階潛水員。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Hanging Gardens',4.1093,118.6253,'中級','','high','西側壁面，軟硬珊瑚垂掛，視覺震撼。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Whitetip Avenue',4.116,118.6353,'中級','鯊魚','high','名稱直接說明一切，白鰭鯊密度極高的固定路線。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Drop Off',4.1176,118.6267,'中級','海龜、鯊魚','high','西巴丹最熱門潛點之一，600 公尺深壁，海龜白鰭鯊常見。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Barracuda Point',4.1209,118.6293,'中級','海龜、鯊魚','high','世界前五潛點之一，成千梭魚集結成龍捲風。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Staghorn Crest',4.1048,118.6356,'高級','','high','南角正北方，淺水珊瑚花園後接 15m 深台地。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('West Ridge',4.1152,118.625,'高級','海龜、鯊魚','high','西巴丹島西側，以海龜與白鰭鯊著名。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Turtle Tomb',4.1195,118.6298,'高級','海龜','high','巨大洞穴系統一部分，可深入 200 公尺，海龜骸骨聞名。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Turtle Cavern',4.1255,118.638,'高級','海龜','medium','西巴丹另一洞穴系統，靠近北角、龜洞附近。',{source:'地圖相對位置估算'}),
+    S('Coral Gardens',4.118,118.635,'中級','鯊魚、海龜','medium','西巴丹礁東北方，峭壁潛後接珊瑚花園。',{source:'sipadan.com 方位確認 + 地圖'}),
+    S('Lobster Lairs',4.107,118.622,'中級','','low','因許多龍蝦居住於此而得名，壁面覆蓋硬軟珊瑚。',{source:'地圖相對位置估算'}),
+    S('Turtle Patch',4.1,118.633,'高級','海龜','low','與珊瑚花園相似的輕鬆珊瑚礁潛點，適合初學者。',{source:'地圖相對位置估算'}),
+    S('North Point',4.122,118.628,'中級','','low','西巴丹島最北端潛點之一，靠近西嶺。',{source:'地圖相對位置估算'}),
+    S('Mid Reef',4.108,118.636,'中級','','low','西巴丹島東側礁區之一，位於白鰭鯊大道與龜地之間。',{source:'地圖相對位置估算'})
+  ],
+  mabul:[
+    S('Crocodile Avenue',4.2494,118.6449,'高級','','high','馬布島知名潛點，靠近碼頭西北方，地形豐富。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Lobster Wall',4.238,118.605,'中級','','medium','馬布島西側壁面潛點群之一。',{source:'地圖方向修正'}),
+    S('Ray Point',4.222,118.612,'中級','','medium','馬布島南方偏西的沙地潛點，常見魟魚。',{source:'地圖方向修正'}),
+    S('Eel Garden',4.2317,118.6419,'高級','微距','high','馬布島最佳潛點之一，沙質平底，大量花園鰻聞名。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Froggy Lair',4.2481,118.6373,'高級','微距','high','馬布島沙地微距代表潛點，能見多種裸鰓、蛙魚。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Seaventure',4.2537,118.6334,'高級','','high','由舊海上石油平台改建的旅館暨潛點，夜潛尤佳。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Stingray City',4.2333,118.6167,'初級','','low','位於主要碼頭對面，以魟魚聚集聞名的沙地潛點。',{source:'方位描述估算'}),
+    S('Ribbon Valley',4.2333,118.6167,'中級','','low','馬布島南端，階梯式坡地下降至 30 公尺。',{source:'方位描述估算'}),
+    S('Panglima Reef',4.2333,118.6167,'初級','海龜','low','馬布島西側聚落附近，坡度緩和的潛點。',{source:'方位描述估算'}),
+    S('House Reef',4.2333,118.6167,'初級','海龜','low','度假村前的家庭式潛點，人工礁生態豐富。',{source:'方位描述估算'}),
+    S('Spear Point',4.242,118.605,'中級','','low','馬布島西北側，與 Lobster Wall 同屬西側壁面群。',{source:'地圖相對位置估算'}),
+    S('Second Wall',4.23,118.603,'中級','','low','馬布島西側，介於 Panglima Reef 與 Lobster Wall 之間。',{source:'地圖相對位置估算'}),
+    S('Buoy Point',4.245,118.655,'中級','','low','馬布島東北方離岸，靠近 Seaventure。',{source:'地圖相對位置估算'}),
+    S('Paradise I',4.25,118.64,'中級','','low','度假村的家庭礁之一，夜潛有機會見到華麗烏賊。',{source:'多篇資料 + 地圖'}),
+    S('Paradise II',4.248,118.642,'中級','','low','度假村的家庭礁之一，以獨特鹿角珊瑚著稱。',{source:'多篇資料 + 地圖'}),
+    S('Jetty Reef',4.245,118.625,'初級','','low','馬布島北側，靠近 Seaventure 區域。',{source:'地圖相對位置估算'}),
+    S('Coral Reef Garden',4.238,118.64,'初級','','low','位於馬布島東南側，介於 Froggy Lair 與 Eel Garden 之間，可見珊瑚及各式礁魚。',{source:'地圖相對位置估算'}),
+    S('Artificial Reef',4.252,118.632,'中級','','medium','靠近Seaventure石油平台的人工結構，由舊漁船金屬零件構成，吸引大型石斑魚與各種小型生物棲息。',{source:'Seaventures Dive、Dive The World，依方位估算',current:'弱'})
+  ],
+  kapalai:[
+    S('The Jetty',4.2258,118.6852,'高級','微距','high','人工礁結構由舊漁船金屬零件構成，曾被評為世界第 5 佳潛點。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Mid Reef',4.2266,118.68,'高級','','high','靠近碼頭礁的緩坡珊瑚坡地，微距攝影愛好者必訪。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Mandarin Valley',4.2266,118.6846,'高級','微距','high','位於 Mid Reef 南方，日落前的華麗魚求偶秀。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Spotted Ray Channel',4.2042,118.6908,'初級','','high','位於礁西南方的沙坡，緩坡下降至 14 公尺。',{source:'divezone.net（內嵌地圖連結）'}),
+    S('Bay',4.222,118.69,'中級','','low','卡帕來潛點之一，具體位置待確認。',{source:'地圖相對位置估算'}),
+    S('Gurnard Ground',4.235,118.688,'中級','','low','以罕見的角魚著稱的潛點。',{source:'地圖相對位置估算'}),
+    S('Coral Reef Garden',4.23,118.69,'初級','海龜','low','可見多彩珊瑚與海洋生物，魟魚、海龜及礁鯊偶爾現蹤。',{source:'地圖相對位置估算'}),
+    S('Kapalai House Reef',4.2167,118.65,'初級','微距','low','水上屋礁盤下方的微距天堂，沙泥底質藏有豆丁海馬、各式裸鰓，夜潛驚喜更多。',{source:'馬來西亞潛水指南 2025.10',depth:'20m'}),
+    S('Cleaning Station',4.227,118.683,'初級','海龜','medium','緩坡式潛點，從礁頂約5公尺深處下降，沿途可見各種奇特小魚與常駐海龜，難度低適合新手。',{source:'Seaventures Dive、Underwater Clicks，依方位估算',current:'弱'}),
+    S('Lobster Rock',4.233,118.687,'中級','','medium','以甲殼類密度高聞名的緩坡珊瑚壁，可同時探索珊瑚牆面與沙質碎石底部。',{source:'Underwater Clicks，依方位估算',current:'弱'})
+  ],
+  perhentian:[
+    S('Tokong Laut (Temple of the Sea)',5.94,102.72,'中級','','medium','又稱「海中聖殿」，停泊島最著名的潛點，巨大岩塊覆蓋硬軟珊瑚，常見多種魚類與竹鯊休息於岩縫下，偶有大型鯨類經過。',{source:'scubadivingperhentian.com、lekkerdivers、ybddivecentre多方交叉比對',depth:'18-24m',current:'中等'}),
+    S('Sugar Wreck (MV Union Star)',5.87,102.68,'中級','','medium','90米長貨船側臥沉於18米深沙地，停泊島最大沉船，船體內部適合探索，常見石斑魚、竹鯊與各種大小魚群。',{source:'scubadivingperhentian.com、Scuba Diving Magazine多方交叉比對',depth:'18m',current:'弱'}),
+    S('Terumbu Tiga (T3)',5.9,102.75,'初級','海龜','medium','三塊巨大岩塊組成的潛點，又稱「三兄弟」，多洞穴與穿越地形，常見鯊魚、大型魚群與海龜。',{source:'scubadivingperhentian.com、ybddivecentre多方交叉比對',depth:'15-20m',current:'弱'}),
+    S('Vietnamese Wreck',5.92,102.7,'中級-高級','','low','1970年代沉沒的越南貨船，深度24米，水流可能較強，適合有經驗潛水員探索。',{source:'scubadivingperhentian.com，依方位估算',depth:'24m',current:'中等'}),
+    S('San Choi Wrecks',5.91,102.74,'初級','','medium','2018年人為沉放的三艦漁船，位於約18米深沙地，已成為新興人氣潛點，魚群密度極高，常見竹鯊與小型蟹類。',{source:'lekkerdivers、ybddivecentre多方交叉比對',depth:'18m',current:'弱'}),
+    S('Stingray Alley',5.89,102.73,'中級','','medium','巨大岩塊構成的斜坡潛點，以黃金鸚哥魚聞名，也可見海龜、鯊魚與墨魚。',{source:'lekkerdivers，依方位估算',depth:'18m',current:'中等'}),
+    S('Tanjung Basi',5.95,102.71,'中級-高級','','low','位於大停泊島最北端，以看見大型洄游魚類與魚群聞名，適合深潛，洞穴與岩石中藏有不少小型生物。',{source:'Scuba Diving Magazine，依方位估算',depth:'18m',current:'強'}),
+    S("D'Lagoon",5.9,102.71,'初級','','low','寧靜淺水潛點，最深約12米，周邊珊瑚礁包圍，沙質底質清澈，適合新手與教學潛水。',{source:'lekkerdivers，依方位估算',depth:'12m',current:'弱'})
+  ],
+  redang:[
+    S('Tanjung Tokong',5.82,103.02,'中級','','medium','位於熱浪島最北端的岩石潛點，靠近海龜保護區，常見魚群與偶爾鯊魚，大多數岩塊覆蓋軟珊瑚與海綿。',{source:'redang.org、scubago.com多方交叉比對',depth:'30m',current:'中等'}),
+    S('Tunnel Point',5.815,103.015,'中級','','medium','巨大岩塊堆疊形成隧道狀結構，可供潛水員穿越，魚類豐富，是熱浪島北區最受歡迎的潛點之一。',{source:'govisitredang.com，依方位估算',depth:'30m',current:'中等'}),
+    S('Cina Terjun',5.77,102.98,'初級','','low','微距攝影愛好者的天堂，沙地周邊常見鯊魚、石頭魚與多種海兔，也適合夜潛。',{source:'govisitredang.com、PADI Blog多方交叉比對',depth:'20m',current:'弱'}),
+    S('Tanjung Tengah',5.78,102.99,'初級','','medium','熱浪島長灘地區的家庭礁，白沙沙地，適合浮潛、夜潛與新手教學，常見小型鯊魚。',{source:'scubago.com，依方位估算',depth:'15m',current:'弱'}),
+    S('Big Mount',5.8,102.97,'中級','','medium','位於里瑪島最北端的岩峰潛點，頂部深度14米，壁面延伸至32米轉接沙地，大型岩塊地貌壯觀。',{source:'scubago.com，依方位估算',depth:'14-32m',current:'中等'})
+  ],
+  langtengah:[
+    S('Batu Bulan',5.79,102.9,'初級','','low','浪中島熱門潛點之一，適合初學者與進階潛水員，珊瑚狀況良好，魚類種類多樣。',{source:'holidaygogogo.com，依方位估算',depth:'26m',current:'弱'}),
+    S('Batu Kuching',5.785,102.92,'初級','','low','浪中島的重點潛點之一，適合初學者與進階潛水員，健康珊瑚與魚群豐富。',{source:'divessi.com，依方位估算',current:'弱'}),
+    S('Yellow Reef (Terumbu Kuning)',5.78,102.91,'初級','','low','黃色珊瑚礁潛點，深度25米，珊瑚色彩鮮豔，魚群密度高。',{source:'holidaygogogo.com，依方位估算',depth:'25m',current:'弱'}),
+    S('House Reef',5.775,102.915,'初級','海龜','low','浪中島南側的家庭礁夜潛地點，常見海龜、竹鯊與小型蟹類。',{source:'holidaygogogo.com，依方位估算',current:'弱'})
+  ],
+  layanglayang:[
+    S('Gorgonian Forest',7.38435,113.848233,'高級','','high','拉央拉央最著名的潛點，壁面從15至40米深，密集的柔珊瑚扇形成壯觀景觀，4-5月有機會遇見大型鯊魚群。',{source:'divezone.net（內嵌地圖連結）',depth:'15-40m',current:'中等'}),
+    S('Dogtooth Lair',7.374217,113.851283,'高級','','high','位於拉央拉央東側，以大型魚群命名，沙坡逐漸轉為陡降壁面，難度適中進階潛水員。',{source:'divezone.net（內嵌地圖連結）',depth:'25-40m',current:'弱'}),
+    S("D'Wall",7.38,113.845,'高級','鯊魚','medium','垂直巨壁一路延伸至2000米深，拉央拉央最著名的峭壁潛點之一，常見魚群。',{source:'underwaterasia.info、divezone.net多方交叉比對',current:'中等'}),
+    S("Shark's Cave",7.378,113.847,'高級','鯊魚','medium','拉央拉央知名的鯊魚潛點，靠近D壁，常見多種鯊魚。',{source:'underwaterasia.info，依方位估算',current:'中等'}),
+    S('The Tunnel',7.36,113.83,'中級','海龜','low','位於拉央拉央島南側的珊瑚斜坡潛點，偶有海龜出現，適合全級別潛水員。',{source:'underwaterasia.info，依方位估算',current:'弱'}),
+    S('Wreck Point',7.372,113.855,'中級','','low','位於大洋側海峽東側的潛點，雖名為沉船但實際上現在只剩少量殘骸，現在以珊瑚花園與壁面景觀為主。',{source:'divezone.net，依方位估算',current:'中等'})
+  ],
+  tulamben:[
+    S('USAT Liberty Wreck',-8.2762,115.5933,'初級','','high','世界級自由號沉船，軟硬珊瑚覆蓋船體，圖蘭本地標潛點。',{source:'印尼潛水指南 2025.10'}),
+    S('Coral Garden',-8.282,115.59,'初級','','medium','鄰近自由號沉船，珊瑚豐富的淺水潛點。',{source:'印尼潛水指南 2025.10'}),
+    S('Tulamben Wall',-8.29,115.587,'中級','','medium','圖蘭本主要潛點集中區之一。',{source:'印尼潛水指南 2025.10'}),
+    S('Kelebit Rocks',-8.295,115.61,'中級','','medium','正式名稱 Batu Kelebit，位於 Drop Off 與 Emerald 之間。',{source:'多篇資料確認方位'}),
+    S('Gerombong',-8.255,115.57,'中級','','low','圖蘭本最北端的潛點。',{source:'地圖相對位置估算'}),
+    S('Batu Ringgit',-8.26,115.575,'中級','','low','圖蘭本北方潛點之一。',{source:'地圖相對位置估算'}),
+    S('Boga Wreck',-8.265,115.578,'中級','','low','圖蘭本北方的沉船潛點。',{source:'地圖相對位置估算'}),
+    S('Kubu Reef',-8.268,115.582,'中級','','low','圖蘭本北方的珊瑚礁潛點。',{source:'地圖相對位置估算'}),
+    S('Alamanda',-8.292,115.593,'中級','','low','圖蘭本主要潛點集中區之一。',{source:'地圖相對位置估算'}),
+    S('Emerald',-8.298,115.615,'中級','','low','位於圖蘭本壁尾端，靠近克里比特岩。',{source:'地圖相對位置估算'}),
+    S('Monkey Reef',-8.27,115.585,'中級','','low','圖蘭本北方靠近庫布區域的潛點。',{source:'地圖相對位置估算'}),
+    S('Bali Relax Wreck',-8.273,115.588,'中級','','low','圖蘭本北方的沉船潛點之一。',{source:'地圖相對位置估算'}),
+    S('Segara',-8.302,115.625,'中級','','low','圖蘭本向南延伸的潛點之一。',{source:'地圖相對位置估算'}),
+    S('Cantik Point',-8.306,115.635,'中級','','low','圖蘭本向南延伸的潛點之一。',{source:'地圖相對位置估算'}),
+    S('Melasti',-8.31,115.645,'中級','','low','圖蘭本向南延伸的潛點之一，接近艾湄灣。',{source:'地圖相對位置估算'}),
+    S('Seraya',-8.315,115.655,'中級','微距','low','圖蘭本與艾湄灣之間的過渡潛點，微距生態豐富。',{source:'地圖相對位置估算'}),
+    S('Tai Sapi',-8.32,115.66,'中級','','low','圖蘭本與艾湄灣之間的過渡潛點之一。',{source:'地圖相對位置估算'}),
+    S('Batu Niti',-8.325,115.665,'中級','','low','圖蘭本與艾湄灣之間的過渡潛點之一。',{source:'地圖相對位置估算'}),
+    S('Sidem',-8.33,115.67,'中級','','low','圖蘭本南端靠近艾湄灣的潛點。',{source:'地圖相對位置估算'})
+  ],
+  amed:[
+    S('Blue Corner',-8.33,115.67,'中級','','medium','艾湄灣熱門潛點之一。',{source:'印尼潛水指南 2025.10'}),
+    S('Jepun',-8.34,115.677,'中級','','medium','艾湄灣潛點之一。',{source:'印尼潛水指南 2025.10'}),
+    S('Japanese Wreck',-8.345,115.68,'中級','','medium','二戰時期的日本沉船遺跡。',{source:'印尼潛水指南 2025.10'}),
+    S('The Pyramids',-8.335,115.672,'初級','','low','人工金字塔結構，深度約 20 公尺，吸引大量海洋生物。',{source:'地圖相對位置估算'}),
+    S('Jemeluk',-8.338,115.675,'初級','','low','艾湄灣知名海灣，以引人入勝的珊瑚坡著稱，適合初學者。',{source:'地圖相對位置估算'}),
+    S('Bunutan',-8.342,115.678,'中級','','low','艾湄灣東側的壁面潛點，適合放流潛水。',{source:'地圖相對位置估算'}),
+    S('Lipah',-8.345,115.682,'中級','','low','艾湄灣潛點之一。',{source:'地圖相對位置估算'}),
+    S('Deep Blue',-8.348,115.686,'中級','','low','艾湄灣深水區域潛點。',{source:'地圖相對位置估算'}),
+    S('Bluu Rocks',-8.352,115.69,'中級','','low','艾湄灣東部岩礁潛點。',{source:'地圖相對位置估算'}),
+    S('Gili Selang',-8.36,115.71,'高級','','low','巴厘島最東端，位於龍目海峽邊緣，進階放流潛點。',{source:'多篇資料 + 地圖'})
+  ],
+  komodonw:[
+    S('Shotgun',-8.475,119.748,'高級','','high','科莫多知名放流潛點，靠近水晶岩與達拉特通道。',{source:'印尼潛水指南 2025.10'}),
+    S('Batu Bolong',-8.555,119.673,'高級','','high','水下尖塔，洋流強勁，色彩繽紛的珊瑚壁面。',{source:'印尼潛水指南 2025.10'}),
+    S('Crystal Rock',-8.485,119.751,'高級','','medium','靠近炮槍通道的水晶般礁石地形。',{source:'印尼潛水指南 2025.10'}),
+    S('Pink Beach',-8.624,119.502,'初級','','medium','科莫多著名粉紅沙灘，鄰近淺水潛點。',{source:'印尼潛水指南 2025.10'}),
+    S('Golden Passage',-8.478,119.762,'中級','','medium','亦名 Darat Passage，位於 Gili Lawa Darat 與科莫多島之間海峽。',{source:'多篇資料確認方位，原座標曾誤差 30 公里已修正'}),
+    S('Toko Toko',-8.44,119.71,'中級','','low','科莫多島最北端的潛點。',{source:'地圖相對位置估算'}),
+    S('Castle Rock',-8.46,119.7,'高級','鯊魚','medium','世界級放流潛點，鯊魚常見，頂部深度約 4 公尺。',{source:'地圖 + 多篇資料'}),
+    S('Light House',-8.47,119.72,'中級','','low','靠近城堡岩與水晶岩的潛點。',{source:'地圖相對位置估算'}),
+    S('The Cauldron',-8.478,119.758,'中級','','low','靠近黃金通道的漩渦地形潛點。',{source:'地圖相對位置估算'}),
+    S('Batu Moncong Bay',-8.45,119.68,'初級','','low','科莫多島北方海灣潛點。',{source:'地圖相對位置估算'}),
+    S('Batu Moncong',-8.455,119.685,'中級','','low','靠近 Batu Moncong Bay 的岩礁潛點。',{source:'地圖相對位置估算'}),
+    S('Wizards Hat',-8.5,119.65,'中級','','low','科莫多島西側潛點。',{source:'地圖相對位置估算'}),
+    S('Tuko Serikaya',-8.52,119.63,'中級','','low','科莫多島西側潛點，靠近巫師帽。',{source:'地圖相對位置估算'}),
+    S('Broken Hall',-8.58,119.55,'中級','','low','科莫多島西南岸潛點。',{source:'地圖相對位置估算'}),
+    S('Logo Bay',-8.6,119.53,'初級','','low','科莫多島西南岸海灣潛點。',{source:'地圖相對位置估算'})
+  ],
+  komodocentral:[
+    S('Makassar Reef',-8.51,119.75,'初級','蝠鲼','medium','亦名 Manta Point，科莫多國家公園最大潛點，蝠鲼清潔站。',{source:'地圖 + 多篇資料'}),
+    S('Sebayur',-8.47,119.83,'初級','','low','科莫多中部小島潛點之一。',{source:'地圖相對位置估算'}),
+    S('Tatawa Besar',-8.49,119.82,'初級','','low','淺水容易的漂流潛點，常見蝠鲼。',{source:'地圖相對位置估算'}),
+    S('Tatawa Kecil',-8.5,119.815,'中級','','low','小島世界級漂流潛點，洋流可能強勁。',{source:'地圖相對位置估算'}),
+    S('Siaba Besar',-8.52,119.825,'中級','','low','西側大型羽毛海星潛點。',{source:'地圖相對位置估算'}),
+    S('Siaba Kecil',-8.515,119.818,'初級','','low','夜潛及魚群著稱的小島潛點。',{source:'地圖相對位置估算'}),
+    S('Kanawa',-8.46,119.87,'初級','','low','靠近勞布安巴喬的小島潛點。',{source:'地圖相對位置估算'}),
+    S('Mawan',-8.545,119.8,'中級','','low','科莫多中部潛點之一。',{source:'地圖相對位置估算'}),
+    S('Pengah Kecil',-8.56,119.84,'中級','','low','小灣及珊瑚礁潛點。',{source:'地圖相對位置估算'}),
+    S('Bonsai',-8.585,119.815,'中級','微距','low','大型軟硬珊瑚及壯麗礁石結構著稱。',{source:'地圖相對位置估算'}),
+    S('Wainilu',-8.6,119.82,'高級','','low','以海龍為主的小型潛點。',{source:'地圖相對位置估算'}),
+    S('Bidadari',-8.48,119.9,'初級','','low','靠近勞布安巴喬的潛點。',{source:'地圖相對位置估算'}),
+    S('Batu Tiga',-8.53,119.78,'高級','鯊魚','medium','科莫多中部高級潛點，通常洋流強勁，以大魚類生態聞名。',{source:'地圖 + 多篇資料'})
+  ],
+  rinca:[
+    S('Cannibal Rock',-8.86,119.738,'高級','微距','medium','生態多樣性極高的知名潛點，靠近 Nusa Kode。',{source:'印尼潛水指南 2025.10'}),
+    S('Manta Alley',-8.86,119.7,'中級','蝠鲼','medium','蝠鲼清潔站聚集地，位置存有爭議，待實際潛過確認。',{source:'座標存疑，見複查紀錄'}),
+    S('German Flag',-8.75,119.5,'中級','','low','科莫多島西南岸潛點。',{source:'地圖相對位置估算'}),
+    S('Tata Island',-8.77,119.48,'中級','','low','科莫多島西南方小島潛點。',{source:'地圖相對位置估算'}),
+    S('Teluk Loh Sera',-8.73,119.51,'初級','','low','科莫多島西南岸海灣潛點。',{source:'地圖相對位置估算'}),
+    S('Tanjung Loh Sera',-8.74,119.505,'初級','','low','靠近 Teluk Loh Sera 的岬角潛點。',{source:'地圖相對位置估算'}),
+    S('Three Sisters',-8.71,119.55,'中級','','medium','三塊相連的大岩石，覆蓋珊瑚及藍色海綿，靠近帕達爾島。',{source:'多篇資料 + 地圖'}),
+    S('Pilaarsteen',-8.7,119.545,'中級','','low','靠近帕達爾島的特殊岸形潛點。',{source:'地圖相對位置估算'}),
+    S('Torpedo Point',-8.84,119.7,'初級','','medium','亦名 Torpedo Alley，位於 Nusa Kode，林卡島南方。',{source:'多篇資料 + 地圖'}),
+    S('Yellow Wall',-8.87,119.73,'高級','','medium','國家公園南區，陡峭坡度潛點，中到強洋流。',{source:'多篇資料 + 地圖'}),
+    S('Banana Reef',-8.85,119.69,'初級','','low','林卡島南方潛點。',{source:'地圖相對位置估算'}),
+    S('Torro Sie',-8.82,119.78,'中級','','low','林卡島東側，靠近 Gili Motang 島。',{source:'地圖相對位置估算'})
+  ],
+  gili:[
+    S('Turtle Heaven',-8.337,116.025,'中級','海龜','medium','確認位於 Gili Meno 北側，經度略偏西。',{source:'地圖交叉比對'}),
+    S('Meno Wall',-8.358,116.046,'中級','','medium','Gili Meno 西側壁面潛點，靠近 Trawangan 方向。',{source:'地圖交叉比對'}),
+    S('Secret Reef',-8.345,116.06,'中級','','medium','依地圖確認位於 Meno 島東側，靠近 Air 島，原座標偏西已修正。',{source:'地圖交叉比對修正'}),
+    S('Shark Point',-8.348,116.015,'中級','鯊魚','medium','確認位於 Gili Trawangan 北側，三島最西端，原座標方向錯誤已修正。',{source:'依 Gili Air 座標反推修正'}),
+    S('Bida Dive',-8.345,116.044,'中級','','low','吉利群島潛點之一。',{source:'地圖相對位置估算'})
+  ],
+  lembeh:[
+    S('Junk Yard',1.45,125.22,'中級','','medium','藍碧海峽微距潛點，座標待精確確認。',{source:'待複查'}),
+    S('Mandarin Bay',1.465,125.18,'中級','','low','以華麗魚聞名的海灣潛點。',{source:'估算'}),
+    S('Police Pier',1.47,125.2,'中級','','low','經地圖確認位於海峽西側本島岸，靠近潛水中心。',{source:'地圖確認方向正確'}),
+    S('AW Shucks',1.5,125.195,'中級','微距','low','藍碧海峽西岸北段潛點。',{source:'地圖相對位置估算'}),
+    S('Hairball',1.497,125.196,'中級','微距','low','藍碧海峽西岸潛點，夜潛熱門。',{source:'地圖相對位置估算'}),
+    S('Hairball Too',1.494,125.197,'中級','','low','靠近 Hairball 的潛點。',{source:'地圖相對位置估算'}),
+    S('Magic Rock',1.491,125.198,'中級','','low','藍碧海峽西岸知名潛點。',{source:'地圖相對位置估算'}),
+    S('TK',1.488,125.199,'中級','','low','藍碧海峽西岸潛點。',{source:'地圖相對位置估算'}),
+    S('Retak Larry',1.485,125.2,'中級','','low','藍碧海峽西岸潛點。',{source:'地圖相對位置估算'}),
+    S('Nudi Retreat',1.482,125.201,'中級','微距','low','藍碧海峽西岸潛點。',{source:'地圖相對位置估算'}),
+    S('Makawide',1.479,125.202,'中級','','low','藍碧海峽西岸潛點。',{source:'地圖相對位置估算'}),
+    S('Jahir',1.476,125.203,'中級','微距','low','黑沙微距天堂，大量紫心海膽及擬態章魚。',{source:'地圖相對位置估算'}),
+    S('Air Pang',1.473,125.204,'中級','','low','藍碧海峽西岸潛點。',{source:'地圖相對位置估算'}),
+    S('Nudi Falls',1.469,125.202,'中級','微距','low','知名夜潛潛點，壁面可見發光黃色管珊瑚。',{source:'多篇資料 + 地圖'}),
+    S('Bianca',1.465,125.201,'中級','','low','以灣內兩艘固定停泊船命名，夜潛可見曼陀林魚求偶。',{source:'多篇資料 + 地圖'}),
+    S('Pantai Kecil',1.461,125.2,'初級','','low','藍碧海峽西岸小灘潛點。',{source:'地圖相對位置估算'}),
+    S('Critter Hunt',1.457,125.199,'中級','微距','low','以微距生態尋寶著稱的潛點。',{source:'地圖相對位置估算'}),
+    S('Madidir',1.44,125.19,'中級','','low','藍碧海峽西岸南段潛點。',{source:'地圖相對位置估算'}),
+    S('Kapal Indah Wreck',1.435,125.192,'中級','','low','覆蓋珊瑚的沉船潛點。',{source:'地圖相對位置估算'}),
+    S('Batu Kapal',1.5,125.26,'中級','','low','藍碧島東岸最北端潛點。',{source:'地圖相對位置估算'}),
+    S("Dante's Wall",1.498,125.258,'高級','','low','靠近巴圖卡帕的壁面潛點。',{source:'地圖相對位置估算'}),
+    S('Pulau Putus',1.478,125.25,'中級','','low','藍碧島東岸潛點之一。',{source:'地圖相對位置估算'}),
+    S('California Dreaming',1.472,125.248,'中級','鯊魚','low','常見大型魟魚及金槍魚經過的彩色珊瑚潛點。',{source:'多篇資料 + 地圖'}),
+    S('Batu Angus',1.468,125.242,'中級','','low','黃昏時分常見曼陀林魚交配行為，靠近天使之窗同區。',{source:'多篇資料 + 地圖'}),
+    S("Angel's Window",1.46,125.24,'中級','','low','尖石地形岩石地質，有一個短通道穿透岩層，可見海扇上的侏儒海馬。',{source:'多篇資料 + 地圖'}),
+    S('Delima Point',1.455,125.238,'中級','','low','藍碧島東岸中段潛點。',{source:'地圖相對位置估算'}),
+    S('Pearl Farm',1.45,125.235,'初級','','low','藍碧島東岸珊瑚潛點。',{source:'地圖相對位置估算'}),
+    S('Air Bajo',1.44,125.232,'中級','','low','藍碧島東岸中南段潛點。',{source:'地圖相對位置估算'}),
+    S('Tanjung Tebal',1.435,125.23,'中級','','low','藍碧島東岸南段潛點。',{source:'地圖相對位置估算'}),
+    S('Pantai Parigi',1.425,125.225,'中級','','low','藍碧島東岸最南段潛點。',{source:'地圖相對位置估算'})
+  ],
+  bunaken:[
+    S('Lekuan I',1.596217,124.767617,'中級','海龜','high','布納肯南側招牌陡牆，因常駐十餘隻大型綠蠵龜而有「海龜城」之稱，牆面陡降超過40米，沿途可見隆頭鸚哥魚群。',{source:'divezone.net（內嵌地圖連結）',depth:'40m',current:'中等'}),
+    S('Lekuan II',1.5955,124.7645,'中級-高級','海龜','medium','與勒庫安一號相鄰的陡牆，垂直深溝與縫隙眾多，魚群密度高，深處常有大型洄游魚類經過。',{source:'依相對位置估算（緊鄰勒庫安一號西側）',depth:'45m',current:'中等'}),
+    S('Lekuan III',1.5945,124.762,'初級','海龜','medium','勒庫安三段式潛點的起點，從緩坡漸轉為垂直牆，適合初學者與開放水域課程。',{source:'依相對位置估算',depth:'30m',current:'弱'}),
+    S('Fukui Point',1.608433,124.740317,'中級','','high','布納肯唯一的斜坡型潛點，以整片硬珊瑚與大型巨蚌聞名，同時是隆頭鸚哥魚的清潔站。',{source:'divezone.net（內嵌地圖連結）',depth:'30m',current:'中等'}),
+    S("Ron's Point",1.6065,124.737,'中級-高級','','medium','緊鄰福井角的沙坡漸轉珊瑚牆潛點，退潮時偶有儒艮出沒覓食海草，深處水流強勁。',{source:'依相對位置估算',depth:'35m',current:'強'}),
+    S('Mandolin',1.617,124.735,'中級','','medium','位於布納肯與馬納多杜阿之間海峽的西側牆潛點，巨大海扇與黑珊瑚樹密布。',{source:'依相對位置估算',depth:'40m',current:'中等'}),
+    S("Mike's Point",1.636833,124.739717,'高級','鯊魚','high','呈半圓形劇場狀的陡牆，覆滿大片黑珊瑚與巨型海扇，水流強勁時偶有大型鯊魚出沒。',{source:'divezone.net（內嵌地圖連結）',depth:'25m',current:'強'}),
+    S("Sachiko's Point",1.633,124.768,'中級','','medium','位於布納肯東北側的經典牆潛點，珊瑚覆蓋率極高，適合漂流潛水。',{source:'依相對位置估算',depth:'30m',current:'中等'}),
+    S('Bunaken Timur',1.618,124.775,'初級','海龜','medium','布納肯島東側的陡牆潛點，礁頂保存完好，是島上最佳浮潛區之一，也適合夜潛。',{source:'依相對位置估算',depth:'25m',current:'弱'}),
+    S('Siladen Jetty',1.629,124.799,'初級','','medium','西拉登島西南側碼頭旁的潛點，淺礁珊瑚狀況極佳，深處牆面覆滿大型海綿與海扇。',{source:'依相對位置估算',depth:'20m',current:'弱'}),
+    S('Manado Tua North',1.64,124.698,'高級','','medium','火山島馬納多杜阿北側的斜坡潛點，水流強勁多變，深處常有魚群與大型洄游魚類聚集。',{source:'依相對位置估算',depth:'30m',current:'強'}),
+    S('Siladen Slope',1.642,124.808,'初級','海龜','medium','緩坡珊瑚花園，海龜每日固定到訪取食海綿。',{source:'印尼潛水指南 2025.10',depth:'5-25m',current:'弱'})
+  ],
+  alor:[
+    S('Bama Wall',-8.22,124.43,'中級-高級','海龜','medium','潘塔島東岸面對阿洛島海峽的招牌陡牆，又稱潘塔大牆，硬珊瑚與軟珊瑚覆蓋率極高，深達60米。',{source:'Dive The World、PADI、Air Dive Alor 多方描述交叉比對',depth:'60m',current:'強'}),
+    S('Munaseli',-8.15,124.42,'高級','鯊魚','medium','潘塔島北端的招牌放流潛點，深層洋流帶來豐富養分，是阿洛群島最容易遇見大型鯊魚群的地點，水流極強需使用勾環固定。',{source:'Nautika Dive Alor、The Seven Seas Liveaboard',depth:'35m',current:'極強'}),
+    S("Kal's Dream",-8.205,124.44,'中級-高級','鯊魚','medium','位於凱帕島與普拉島之間海底的雙尖峰海丘，以印尼潛水先驅Kal Muller命名，常見大型洄游魚類、鯊魚與魚群通過。',{source:'Savu South Alor、Alor Pearl of the Far East',depth:'40m',current:'強'}),
+    S('The Cathedral',-8.32,124.56,'高級','鯊魚','low','阿洛南側的招牌洞穴潛點，狹窄通道相連至淺水出口，沿途珊瑚密布，偶有護士鯊棲息於洞穴中。',{source:'Air Dive Alor、Divernet，方位描述估算，信心較低',depth:'30m',current:'中等'}),
+    S('Babylon',-8.215,124.435,'中級','','medium','位於特爾納特島南岸的經典垂直牆潛點，礁頂淺水珊瑚花園延伸至25-30米深的斜坡，能見度極佳。',{source:'The Seven Seas Liveaboard',depth:'30m',current:'中等'}),
+    S('Pasir Merah',-8.27,124.4,'中級','海龜','medium','位於普拉島北側的火山地質潛點，淺水處為獨特的紅色火山沙地並可見冒泡氣孔，深處轉為35米深的礁牆。',{source:'The Seven Seas Liveaboard、Divernet',depth:'35m',current:'弱'}),
+    S('Mucky Mosque',-8.23,124.525,'初級','','medium','卡拉巴希灣內的招牌泥地微距潛點，黑色火山沙地上棲息各種石頭魚、擬態章魚與小蟹，也適合夜潛。',{source:'Coralia Liveaboard、Nautika Dive Alor',depth:'20m',current:'弱'}),
+    S('Bakalang Jetty',-8.225,124.535,'初級','','medium','卡拉巴希灣內新舊兩座碼頭並列的沙地微距潛點，深度僅約14米，適合新手與長時間微距攝影。',{source:'Divernet',depth:'14m',current:'弱'}),
+    S('Goa Wolang',-8.38,124.6,'中級-高級','','low','阿洛島南側水溫較低的洞穴潛點，內有兩個大型洞窟，一個帶氣穴、一個可穿越，常見魚群與護士鯊。',{source:'Nautika Dive Alor，方位估算，信心較低',depth:'25m',current:'中等'}),
+    S('鱷魚嘴',-8.29,124.45,'高級','鯊魚','medium','裂縫深處垂掛直徑約3米海扇，夜潛可見豹紋鯊沿沙溝巡遊。需深潛認證，能見度通常良好。',{source:'印尼潛水指南 · 2025.10',depth:'20-60m+'}),
+    S('小浴室',-8.24,124.38,'初級','豆丁海馬','medium','馬蹄形火山口泥地，曾發現全球最小豆丁海馬之一（約1.5公分）。小型清潔生物在岩縫建立服務站，緩流環境適合微距攝影練習。',{source:'印尼潛水指南 · 2025.10',depth:'5-15m'})
+  ],
+  maumere:[
+    S('Babi Island',-8.4241,122.5103,'中級','海龜、鯊魚','high','位於莫米爾灣外緣的小島，1992年大地震海浪重創此島，如今已恢復生機，陡壁覆滿大型海扇與軟珊瑚，適合大範圍與微距攝影。',{source:'Wikipedia（Babi Island坐標）、Santai Divers、NOMADasaurus',depth:'30m',current:'弱'}),
+    S('Besar Island Barrier Reef',-8.4625,122.3775,'初級','海龜','high','印尼少數的堡礁地形之一，東側形成大片潟湖，是莫米爾灣最大的島嶼，珊瑚狀況與能見度是灣內最佳，也是最容易遇見大型海洋生物的地點。',{source:'Wikipedia（Besar Island, Flores 坐標）、starfish.ch',depth:'25m',current:'弱'}),
+    S('Pangabatang North',-8.4787,122.4618,'初級','','medium','適合初學者的緩坡珊瑚潛點，巨大海扇密布，也是浮潛絕佳地點，潮流平穩時能見度良好。',{source:'world-islands.net（島嶼中心坐標），依島北側方位估算',depth:'20m',current:'弱'}),
+    S('Wai Terang Wreck',-8.58,122.33,'中級','','low','二戰時期沉沒的日本沉船，船體已覆蓋珊瑚，周邊沙地適合微距潛水，常見魚群、石頭魚與多種小型蟹類。',{source:'Santai Divers、The Seven Seas Liveaboard，方位估算，信心較低',depth:'33m',current:'弱'}),
+    S('Sea World Muck',-8.565,122.32,'初級','微距','medium','沃東海岸線的招牌泥地微距潛點，沙泥底質棲息多種奇特小魚與擬態章魚，也是絕佳的夜潛地點。',{source:'NOMADasaurus、Experience Travel Group',depth:'18m',current:'弱'}),
+    S('Ankermi Bay Muck',-8.57,122.325,'初級','微距','low','老牌泥地微距潛點，曾因風雨覆蓋碎石而受損，仍時有石首魚、鬼海龍與多種小型蟹類出沒，適合尋寶式微距潛水。',{source:'Merapi Tour & Travel，方位估算，信心較低',depth:'15m',current:'弱'}),
+    S('Waiara House Reef',-8.6,122.28,'初級','','low','鄰近度假村的家庭式珊瑚礁潛點，從岸邊即可下水，適合新手與夜潛，沙地與珊瑚交錯棲息多種底棲生物。',{source:'Experience Travel Group，方位估算，信心較低',depth:'15m',current:'弱'})
+  ],
+  dampier:[
+    S('Wayag',0.16,130.04,'初級','','high','淺水珊瑚密度全球第一（每平方公尺12種），地標性石灰岩島群景觀，是四王群島最經典的空拍地標。',{source:'印尼潛水指南 2025.10',depth:'3-25m',current:'中等'}),
+    S('Cape Kri',-0.555,130.69,'中級-高級','鯊魚','high','金氏世界紀錄單潛374種魚類的地點，鯊魚與隆頭鸚哥魚群聚，是丹皮爾海峽招牌潛點。',{source:'印尼潛水指南 2025.10',depth:'5-40m+',current:'強'}),
+    S('Selepele Bay',-0.2,130.32,'中級','章魚','low','火海膽叢間可見斑馬蟹，擬態章魚偽裝其中，適合夜潛微距攝影。',{source:'印尼潛水指南 2025.10',depth:'10-30m',current:'中等'}),
+    S('Manta Ridge',-0.567,130.55,'中級-高級','蝠鲼','high','常有30隻蝠鲼排隊清潔的世界級潛點，水流強勁需使用流鉤固定，鄰近阿爾博雷克全年穩定。',{source:'印尼潛水指南 2025.10',depth:'8-20m',current:'強'}),
+    S('Blue Wall',-0.62,130.58,'中級-高級','豆丁海馬','low','垂直峭壁覆蓋黑珊瑚，鞭珊瑚間藏有豆丁海馬。',{source:'印尼潛水指南 2025.10',depth:'30-40m',current:'中等'}),
+    S('Fam Islands',-0.66,130.4,'初級','','low','石灰岩島群淺礁，隆頭鸚哥魚啃食巨蚌，適合初學者。',{source:'印尼潛水指南 2025.10',depth:'5-25m',current:'中等'}),
+    S('Blue Magic',-0.5,130.75,'高級','','low','丹皮爾海峽知名放流潛點，常見大型魚群與蝠鲼。',{source:'使用者提供地圖相對位置估算',current:'強'}),
+    S('Sardine Reef',-0.56,130.72,'中級','','low','靠近克里角的沙丁魚集結潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Mios Kon',-0.48,130.73,'中級','','low','Waigeo島南側知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Friwinbonda',-0.45,130.7,'中級','','low','丹皮爾海峽北側知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S("Melissa's Garden",-0.62,130.42,'初級','','low','四王群島最著名珊瑚花園之一，硬珊瑚保存非常完整。',{source:'使用者提供地圖相對位置估算'}),
+    S('Arborek',-0.57,130.52,'初級','','low','Gam與Mansuar島之間的小島，碼頭聚落常見魚群，適合岸潛。',{source:'使用者提供地圖相對位置估算',current:'弱'}),
+    S('Yenbuba',-0.58,130.5,'初級','','low','靠近阿爾博雷克島的碼頭潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Sawandarek',-0.59,130.53,'初級','','low','曼蘇亞爾島附近村落碼頭潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Galaxy',-0.6,130.45,'中級','','low','靠近Penemu區域的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S("Edi's Black Forest",-0.4,130.3,'中級','','low','Gam島北側知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Passage',-0.45,130.55,'中級','','low','丹皮爾海峽地圖上標示的通道潛點，適合放流潛水。',{source:'使用者提供地圖相對位置估算',current:'強'}),
+    S('Amborek',-0.38,130.28,'中級','','low','Gam島附近潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Mayhem',-0.39,130.29,'中級','','low','靠近Amborek的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('My Reef',-0.61,130.44,'中級','','low','靠近Penemu區域的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Keruo Night',-0.63,130.43,'中級','','low','Penemu區域夜潛知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Algae Patch 1&2',-0.7,130.55,'初級','','low','巴坦塔島附近淺水珊瑚潛點，共分兩個區塊，適合初學者。',{source:'使用者提供地圖相對位置估算'}),
+    S('Eagle Rock',-0.15,130.2,'中級','','low','Waigeo島北部知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Batu Lima',-0.1,130.15,'中級','','low','Waigeo島北部潛點。',{source:'使用者提供地圖相對位置估算'})
+  ],
+  misool:[
+    S('Farondi Cave',-2.2,130.5,'中級','豆丁海馬','medium','隧道洞穴系統，柳珊瑚叢間棲息鬼海龍，是米蘇爾秘境的核心潛點。',{source:'印尼潛水指南 2025.10',depth:'10-40m+',current:'中等'}),
+    S('Blue Water Mangroves',-2,130.18,'初級','','medium','紅樹林根系形成的天然育嬰場，洋流滋養軟珊瑚生態，適合初學者。',{source:'印尼潛水指南 2025.10',depth:'3-15m',current:'弱'}),
+    S('The Pinnacles (Misool)',-2.1,130.45,'高級','錘頭鯊','low','海山頂部吸引錘頭鯊群聚集，目擊率約六成，是米蘇爾的大型生物觀測點。',{source:'印尼潛水指南 2025.10',depth:'15-50m+',current:'強'}),
+    S('Boo Window',-2.2,130.15,'中級','','low','米蘇爾最著名的地標性潛點，島嶼中的天然石窗造型。',{source:'使用者提供地圖相對位置估算'}),
+    S('Boo East',-2.21,130.17,'中級','','low','靠近布窗的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('4 Kings',-1.95,130.1,'高級','','low','米蘇爾知名放流潛點，常見大型魚群。',{source:'使用者提供地圖相對位置估算',current:'強'}),
+    S('Whale Rock',-2.05,130.25,'中級','','low','地標性岩石潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Magic Mountain',-2.02,130.22,'初級','','low','米蘇爾知名清潔站，也適合淺潛。',{source:'使用者提供地圖相對位置估算'}),
+    S('Wedding Cake',-2.15,130.12,'中級','','low','石灰岩地貌潛點，形狀因而得名。',{source:'使用者提供地圖相對位置估算'}),
+    S('Barracuda Rock',-2.18,130.14,'中級','','low','常見大型魚群巡遊的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Gorgonian Passage',-2.12,130.18,'中級','','low','多島集中的通道潛點，軟珊瑚豐富，適合放流潛水。',{source:'使用者提供地圖相對位置估算',current:'強'}),
+    S('Warna Berwarna',-2,130.3,'初級','','low','Daram區域珊瑚豐富的潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Andiamo',-2.01,130.31,'中級','','low','Daram區域知名潛點。',{source:'使用者提供地圖相對位置估算'}),
+    S('Candy Store',-2.02,130.32,'中級','微距','low','Daram區域微距潛點。',{source:'使用者提供地圖相對位置估算'})
+  ],
+  triton:[
+    S('Little Komodo',-3.85,134.1,'中級','','low','塔蘭灣最著名潛點之一，巨大岩塊完全被軟珊瑚覆蓋，常見大型魚群及步行鯊。',{source:'多篇潛水專欄交叉確認'}),
+    S("Bo's Rainbow",-3.86,134.12,'初級','','low','彩色潛點，軟珊瑚、大型海綿及魚群組成繽紛景色，適合廣角與微距攝影。',{source:'多篇潛水專欄交叉確認'}),
+    S('Pintu Arus',-3.88,134.14,'高級','','low','放流敏感潛點，養分豐富的水質支撐大量魚群，常見掠食性魚類巡邏。',{source:'多篇潛水專欄交叉確認',current:'強'}),
+    S('Flasher Beach',-3.84,134.13,'中級','','low','以特有的花斑龍魚著稱的潛點，屬於塔蘭灣的特有物種。',{source:'多篇潛水專欄交叉確認'}),
+    S('Namatota Wall',-3.89,134.17,'中級','','low','石灰岩壁面潛點，大型海綿、黑珊瑚及魚群主導景觀。',{source:'多篇潛水專欄交叉確認'}),
+    S('Bagans',-3.9,134.2,'初級','','low','傳統漁業平台附近潛點，因小魚集結吸引大型魚群，全年都有機會碰到。',{source:'多篇潛水專欄交叉確認'}),
+    S('Rainbow Wall',-3.85,134.05,'中級','','low','峭壁覆蓋七彩柳珊瑚，深處常有上百隻金字塔蝴蝶魚群游過。',{source:'印尼潛水指南 2025.10，座標估計'}),
+    S('Pygmy Gorge',-3.8,134.1,'初級','豆丁海馬','low','紅海扇叢中曾發現2019年新種豆丁海馬（體長僅1.2公分）。',{source:'印尼潛水指南 2025.10，座標估計'})
+  ],
+  cenderawasih:[
+    S('Whale Shark Canteen',-3.34,134.92,'初級','鯨鯊','high','漁民漁船下錨處，鯨鯊會垂直吸食漁獲，最近距離可達1公尺（禁止觸碰）。',{source:'印尼潛水指南 2025.10',depth:'3-15m',current:'弱'}),
+    S('WWII Wreck',-2.85,134.1,'中級','豆丁海馬','low','美軍運輸船殘骸覆蓋32種軟珊瑚，船艏藏身三斑豆丁海馬。',{source:'印尼潛水指南 2025.10，座標估計',depth:'18-30m',current:'弱'})
+  ],
+  kofiau:[
+    S('Boo Windows (Kofiau)',-1.18,129.82,'中級','','low','科菲阿最著名的地標性潛點，天然石灰岩地質形成特殊的石窗地形，周邊珊瑚保存狀態優良，魚類密度高，屬於四王群島最少人探訪的區域之一。',{source:'DiveIndonesia.com，依方位估算',current:'中等'}),
+    S('Kofiau Mangrove Channel',-1.22,129.88,'初級','微距','low','科菲阿島的藍水紅樹林水道，漸層地形從淺水紅樹林根系延伸至開放水域，適合微距攝影，偶有小型鯊魚出沒。',{source:'Cruising Indonesia，依方位估算',current:'弱'})
+  ],
+  kubu:[
+    S('Batu Ringgit',-8.24,115.55,'中級','','low','庫布區域潛點。',{source:'使用者提供地圖，依序列位置估算'}),
+    S('Boga Wreck',-8.245,115.555,'中級','','low','以沉船為主的潛點。',{source:'使用者提供地圖，依序列位置估算'}),
+    S('Kubu Reef',-8.25,115.56,'初級','','low','珊瑚礁潛點。',{source:'使用者提供地圖，依序列位置估算'}),
+    S('Monkey Reef',-8.255,115.565,'初級','','low','庫布區域潛點之一。',{source:'使用者提供地圖，依序列位置估算'}),
+    S('Bali Relax Wreck',-8.258,115.568,'中級','','low','庫布區域另一沉船潛點。',{source:'使用者提供地圖，依序列位置估算'})
+  ],
+  penida:[
+    S('Manta Bay',-8.769,115.469,'中級','蝠鲼、鯊魚','high','全球最穩定的蝠鲼清潔站，每日10-20隻翼展4米蝠鲼盤旋，潛水員需趴伏沙地觀察，強流時蝠鲼逆流滑翔姿態壯觀。禁止追逐或觸碰。',{source:'印尼潛水指南 2025.10',depth:'8-20m',current:'中等'}),
+    S('Blue Corner (Penida)',-8.75,115.55,'高級','翻車魚','low','強流過山車潛點，入水即被洋流帶向海角，需用流鉤固定礁石。深處常見大型翻車魚與重達80公斤的隆頭魚，僅限有經驗潛水員。',{source:'印尼潛水指南 2025.10，座標需確認',depth:'18-60m+',current:'極強'}),
+    S('Ceningan Wall',-8.704,115.461,'高級','海狼群','medium','龍目海峽核心激流區，流速可達5節，吸引大型洄游掠食者，百米長梭魚漩渦與鮪魚群突襲。僅限經驗豐富潛水員。',{source:'印尼潛水指南 2025.10',depth:'15-50m+',current:'極強'}),
+    S('Mangrove',-8.667,115.47,'初級','豆丁海馬','medium','藍夢島北岸緩坡潛點，紅樹林根系形成天然育嬰場，沙地花園鰻群搖曳，海草叢藏葉海龍，新手教學與夜潛聖地。',{source:'印尼潛水指南 2025.10',depth:'5-15m',current:'弱'}),
+    S('Crystal Bay',-8.708,115.443,'中級-高級','翻車魚','high','翻車魚核心觀測點，下潛至35米冷水層可見翻車魚懸浮峭壁邊緣，中層常有上百隻隆頭鸚哥魚啃食珊瑚。',{source:'印尼潛水指南 2025.10',depth:'10-40m+',current:'強'}),
+    S('SD Wreck',-8.685,115.503,'中級','海狼群','medium','1940年沉沒的荷蘭貨船，船體傾斜在沙地上，甲板聚集海狼魚群，船艙內藏葉形蓑鮋與瓷蟹，船尾螺旋槳是經典廣角攝影機位。',{source:'印尼潛水指南 2025.10',depth:'12-28m',current:'中等'})
+  ],
+  ambon:[
+    S('Palu Bay',-3.65,128.18,'中級','','low','火山灰覆蓋的斜坡潛點，密度極低的迷幻蛙魚棲息於此，皮膚紋路如流動油畫，是安汶最著名的微距潛點。',{source:'印尼潛水指南 2025.10，座標估計',depth:'10-25m',current:'弱'}),
+    S('Rainbow Reef (Ambon)',-3.67,128.2,'初級','','low','人工沉船培育出27種珊瑚，船體縫隙聚居斑馬蟹，適合初學者與珊瑚花園攝影。',{source:'印尼潛水指南 2025.10，座標估計',depth:'5-18m',current:'弱'})
+  ],
+  derawan:[
+    S('Sangalaki Cleaning Station',2.077,118.39,'中級','蝠鲼、鯊魚','high','12-15隻蝠鲼排隊接受清潔服務，礁鯊在通道形成巡遊隊列，是達拉灣群島最著名的清潔站。',{source:'印尼潛水指南 2025.10',depth:'8-15m',current:'中等'}),
+    S('Kakaban Jellyfish Lake',2.15,118.51,'初級','','high','與世隔絕的鹹水湖，棲息400萬隻無毒水母，浮潛時水母群如星河包裹身體，是印尼最獨特的體驗之一。',{source:'印尼潛水指南 2025.10',depth:'0-15m',current:'弱'}),
+    S('Maratua Tunnel',2.25,118.62,'中級','海狼群','medium','海底隧道入口聚集約3000隻海狼魚，大型石斑守衛洞穴周邊，是尋找海狼群風暴的招牌潛點。',{source:'印尼潛水指南 2025.10',depth:'15-28m',current:'中等'})
+  ],
+  addu:[
+    S('British Loyalty Wreck',-0.67,73.18,'中級-高級','蝠鲼','high','阿杜環礁二戰時期140米長英國油輪，30米海底，船體已成蝠鲼清潔站，馬爾地夫最大沉船潛水點。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m',current:'中等'}),
+    S('Manta Point Addu',-0.62,73.22,'中級','蝠鲼、鯊魚','medium','阿杜環礁內潟湖珊瑚礁庇護，硬珊瑚花園蘇眉魚與彩虹雀鯛，灰礁鯊、白鰭礁鯊、偶見銀鰭鯊。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'20m',current:'中等'})
+  ],
+  raa:[
+    S('Finolhu Thila',5.6,72.95,'中級-高級','鯊魚、海龜','medium','拉阿環礁南部懸垂岩與裂縫充滿旗魚與成群橙色鯥魚，金槍魚、石斑魚、拿破崙瀨魚出沒。',{source:'馬爾地夫潛水指南 2025.10',depth:'35m',current:'中等'}),
+    S('The Labyrinth',5.75,72.92,'中級','鯊魚','low','拉阿環礁代表性尖峰，巨大柳珊瑚與彩色軟珊瑚環繞峽谷、隧道與泳道，蝙蝠魚、灰鰭與白鰭礁鯊、海鰻、石斑魚常見。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'30m',current:'中等'})
+  ],
+  noonu:[
+    S('Christmas Rock',5.92,73.38,'初級','鯊魚','medium','諾努環礁水下島嶼，頂部14米深，白鰭礁鯊與黃貂魚家園，洞穴中偶見護士鯊。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m',current:'中等'}),
+    S('Orimas Thila',5.85,73.4,'高級','鯊魚','medium','諾努環礁深度達30米的水下海山，灰礁鯊、豹紋鯊、吉他鯊與魟魚成群出沒，需高氧認證。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m+',current:'強'})
+  ],
+  northmale:[
+    S('Manta Point',4.13,73.55,'初級','蝠鲼、海龜','high','北馬累環礁東南部蝠鲼清潔站，常見梭魚群、海龜、拿破崙瀨魚，距馬累快艇1小時。',{source:'馬爾地夫潛水指南 2025.10',depth:'25m',current:'中等'}),
+    S('Maldives Victory Wreck',4.2,73.52,'中級-高級','','high','328英尺長沉船，水下12-35米，上層建築覆柳珊瑚與硬珊瑚，蝙蝠魚、石斑魚、梭魚成群。',{source:'馬爾地夫潛水指南 2025.10',depth:'35m',current:'中等'})
+  ],
+  fuvahmulah:[
+    S('Tiger Zoo',-0.3,73.42,'高級','鯊魚','high','富瓦穆拉環礁全球唯一全年穩定觀測虎鯊的潛點，深海火山島斷崖，強流將深海養分推至淺層，銀鰭鯊、金槍魚成群。',{source:'馬爾地夫潛水指南 2025.10',depth:'25m',current:'中等'}),
+    S('Thresher Point',-0.28,73.45,'高級','錘頭鯊、鯊魚','medium','富瓦穆拉2000米深海斷崖邊緣，長尾鯊全年游弋，1-3月錘頭鯊群進行交配儀式，銀鰭鯊、金槍魚成群。',{source:'馬爾地夫潛水指南 2025.10',depth:'40m',current:'強'})
+  ],
+  ari:[
+    S('Fish Head (Mushimasmingili Thila)',3.95,72.83,'高級','錘頭鯊、鯊魚','high','阿里環礁海洋保護區，黑珊瑚覆蓋懸崖峭壁，錘頭鯊深潛經典點，藍線鯛魚成群洞穴。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m+',current:'強'}),
+    S('Maaya Thila',4.05,72.78,'中級-高級','裸鰓類、海龜','high','阿里環礁落差20-100英尺尖峰，海蛞蝓、躄魚等微距生物棲息地，夜潛經典。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m',current:'中等'})
+  ],
+  huvadhu:[
+    S('Vilingili Kandu',0.4,73.42,'高級','鯊魚、錘頭鯊','medium','胡瓦杜環礁世界最大最深環礁之一的代表水道，水流湍急，可見絲鯊、大錘頭鯊、遠洋黑鰭鯊、灰礁鯊。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'30m',current:'強'}),
+    S('Huvadhu Manta Cleaning Station',0.38,73.3,'中級','蝠鲼','medium','胡瓦杜環礁蝠鲼清潔站，犬牙金槍魚、巨型鰺魚、梭魚、蘇眉魚，有時可見鷹鱝群與蝠鲼，夜潛觀賞護士鯊。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'20m',current:'中等'})
+  ],
+  haaalifu:[
+    S('Ihavandhoo Kandu',6.95,72.92,'中級','蝠鲼、海龜','medium','伊哈萬德希波爾胡環礁的寬闊淺水道，蝠鲼清潔站，溫和洋流，礁石懸垂與礁壁覆蓋桌形珊瑚，洞穴與尖峰藏微距攝影。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'30m',current:'中等'}),
+    S('Filadhoo Wreck',6.85,72.95,'中級','海龜','low','伊哈萬德希波爾胡環礁的沉船潛點，鷹鱝巢穴，鬚鯊與石斑魚棲息。',{source:'馬爾地夫潛水指南 2025.10，座標粗估',depth:'30m',current:'弱'})
+  ],
+  southmale:[
+    S('Cocoa Thila',3.87,73.5,'高級','鯊魚、海狼群','high','南馬累環礁頂級放流潛點，梭魚、甜唇魚、紅鯛魚、鰺魚、鷹鱝、白鯊、灰鯊匯聚。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m',current:'強'}),
+    S('Vadhoo Caves',3.93,73.5,'中級-高級','海龜','medium','南馬累環礁北部，為潛水員提供躲避強流的庇護所，獨角魚、士兵魚、偶見海龜，礁鯊與金槍魚在蔚藍水域。',{source:'馬爾地夫潛水指南 2025.10',depth:'25m',current:'強'})
+  ],
+  baa:[
+    S('Hanifaru Bay',5.27,73.1,'中級','蝠鲼、鯨鯊','high','芭環礁UNESCO生物圈保護區，5-11月西南季風期間，數十隻蝠鲼螺旋上升清潔餵食，並有鯨鯊出沒。',{source:'馬爾地夫潛水指南 2025.10',depth:'15m',current:'中等'}),
+    S('Nelivaru Thila',5.18,73.05,'中級','蝠鲼','medium','芭環礁地形奇特尖峰，懸崖峭壁與峽谷覆蓋硬珊瑚與軟珊瑚，玻璃魚、梭魚、蝙蝠魚、石斑魚與東方甜唇魚。',{source:'馬爾地夫潛水指南 2025.10',depth:'30m',current:'中等'})
+  ],
+  anilao:[
+    S('Twin Rocks',13.74,120.92,'中級','裸鰓類、章魚','low','阿尼洛黑水潛水代表點，螢光蝦、深海螢火蟲，裝備建議紅光手電、200mm微距鏡頭。',{depth:'10-25m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('Secret Bay (Manit Muck)',13.71,120.9,'初級','裸鰓類、章魚','medium','阿尼洛最著名的微距點，魅力媲美藍碧海峽，擬態章魚、火焰烏賊、鬼海龍、螳螂蝦。',{depth:'5-21m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  subicbay:[
+    S('USS New York Wreck',14.79,120.27,'中級-高級','','low','1898年美西戰爭中被擊沉的裝甲巡洋艦，全長117米，能見度較低但歷史內涵豐富，適合技術潛水員。',{depth:'18-30m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('El Capitan Wreck',14.8,120.28,'中級','','low','造訪蘇比克灣的經典沉船，船體側倒便於探索。',{depth:'5-20m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  aporeef:[
+    S('Apo 29',12.65,120.4,'高級','鯊魚、錘頭鯊、蝠鲼','medium','阿波礁代表潛點，巨型海山，礁鯊、長尾鯊、錘頭鯊、蝠鲼與大量遠洋魚類。',{depth:'15-40m',current:'強',source:'菲律賓潛水指南 2025.10'})
+  ],
+  coron:[
+    S('Okikawa Maru',12.01,120.06,'中級','','high','160米長的油輪，船體覆滿珊瑚，可穿透貨艙和引擎室（注意強流），科隆代表性沉船。',{depth:'10-26m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Akitsushima',12.02,120.02,'高級','','high','日本水上飛機母艦，起重機殘骸靜臥沙地，如今軟珊瑚裹身，需AOW以上。',{depth:'20-38m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Barracuda Lake',11.99,120.21,'中級','','high','需攀爬石灰岩抵達的地熱淡水湖，水溫分層從表層28°C驟升至湖底38°C，超現實體驗，能見1.5米梭魚。',{depth:'5-30m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('Moruzan Maru',12.05,120.04,'初級','海龜','low','120米貨輪，側倒於海床，貨艙和機房易於穿透，珊瑚覆蓋左舷。',{depth:'15-30m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('Coral Garden (Coron)',12,120.2,'初級','裸鰓類','low','古托布灣的淺礁區，適合夜潛和微距攝影，小丑魚、海葵、裸鰓類。',{depth:'5-18m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  moalboal:[
+    S('Sardine Run',9.945,123.378,'初級','','high','百萬級沙丁魚群旋渦，岸潛直達，最佳是晨間9-12點魚群密集且光線穿透強，拍攝忌閃光驚擾魚群。',{depth:'5-25m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('Pescador Island',9.937,123.339,'中級','','high','以教堂洞光柱聞名的仙境般潛點，鷹鱝偶見，峭壁地形刺激。',{depth:'10-40m',current:'中等',source:'菲律賓潛水指南 2025.10'})
+  ],
+  bohol:[
+    S('Balicasag Wall',9.516,123.687,'中級-高級','海龜','high','千米垂直落差的世界級大斷層，Jack魚風暴、海龜常見，季節對時有機會遇見鯨鯊。',{depth:'5-60m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Pamilacan',9.486,123.91,'中級','蝠鲼','medium','海底高原地形，是蝠鲼遷徙通道，可串接Jack魚風暴觀測。',{depth:'15-30m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Napaling',9.605,123.755,'初級','','medium','浮潛看沙丁魚風暴聖地，薄荷島北岸，有水下飛機殘骸可探索。',{depth:'5-25m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  tubbataha:[
+    S('Shark Airport',8.93,119.82,'高級','鯊魚、鯨鯊、海龜','high','放流聖地，白鰭礁鯊如飛機般排列在沙地停機坪上，珊瑚斜坡通向布滿洞穴的峭壁，夜潛可見護士鯊捕食。',{depth:'20-61m+',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Washing Machine (Tubbataha)',8.95,119.8,'高級','蝠鲼、鯨鯊、鯊魚','low','洋流如洗衣機般驟變方向，裂縫礁岩中棲息著蝠鲼和礁鯊，能見度極高時可遠眺深藍中的鯨鯊身影。',{depth:'25-61m',current:'極強',source:'菲律賓潛水指南 2025.10'}),
+    S('Amos Rock',8.86,119.94,'中級-高級','鯊魚、豆丁海馬、裸鰓類','medium','巨型柳珊瑚背景下，拿破崙魚與犬牙金槍魚群巡遊，夜間淺水區成為微距天堂，柳珊瑚上藏著豆丁海馬。',{depth:'15-40m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Dulsan Wreck',8.83,119.97,'高級','錘頭鯊、鯊魚、海狼群','low','以小型沉船命名，真正亮點是裂縫峽谷，灰礁鯊群圍獵魚群，錘頭鯊在深藍區巡邏。',{depth:'18-35m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Black Rock',8.78,119.96,'高級','蝠鲼、海龜、鯊魚','low','沿峭壁漂流邂逅蝠鲼清潔站，這些蝠鲼環繞礁石讓清潔魚服務，強流區偶遇鯊魚。',{depth:'15-30m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Jessie Beazley Reef',9.06,119.78,'高級','鯊魚','high','蘑菇形礁石吸引獨角魚風暴，隆頭鸚哥魚啃食珊瑚，強流時可見灰礁鯊群。',{depth:'20-50m+',current:'強',source:'菲律賓潛水指南 2025.10'})
+  ],
+  apoisland:[
+    S('Chapel (Apo)',9.073,123.272,'初級','海龜','medium','綠海龜清潔站，晨間傑克魚風暴，適合初學者與微距攝影者。',{depth:'12-18m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('Rock Point West',9.075,123.265,'中級','海龜、海狼群','medium','玳瑁龜、鷹鱝、海狼群，中等洋流適合OW潛水員進階練習。',{depth:'10-30m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Cogon',9.069,123.272,'初級','豆丁海馬','medium','豆丁海馬、火焰烏賊、硬珊瑚花園，夜潛生態豐富，適合微距攝影。',{depth:'5-15m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('South Point (Apo)',9.062,123.273,'中級-高級','鯊魚','medium','灰礁鯊通道、巨型柳珊瑚，需中級以上認證並具備放流經驗。',{depth:'18-25m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Coral Garden (Apo)',9.075,123.275,'初級','','medium','小丑魚巢穴、藍刺尾魚群，適合新手教學與輕鬆休閒潛水。',{depth:'3-12m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  elnido:[
+    S('South Miniloc',11.13,119.36,'中級-高級','海龜','medium','銀色金槍魚群、黃鰭魚風暴、海龜，強流區需放流專長。',{depth:'5-12m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Nat Nat',11.2,119.42,'初級','豆丁海馬、裸鰓類','low','海馬、裸鰓類、蠍子魚，微距拍攝需60mm以上鏡頭。',{depth:'10-20m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('North Rock',11.32,119.3,'高級','鯊魚、海狼群','low','黑鰭礁鯊、魚群、梭魚龍捲風，需深潛與強流認證，建議AOW以上。',{depth:'18-32m',current:'強',source:'菲律賓潛水指南 2025.10'}),
+    S('Entalula Island',11.21,119.48,'中級-高級','鯊魚、章魚','medium','章魚、礁鯊、大理石魟、獅子魚，洞穴穿越需導潛陪同。',{depth:'15-35m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Dilumacad Tunnel',11.27,119.36,'中級','','medium','西班牙鯖魚、蟹群、魟魚，隧道禁止獨自穿越。',{depth:'8-12m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  puertogalera:[
+    S('La Laguna Point',13.51,120.96,'初級','裸鰓類','medium','平緩的短峭壁潛點，水流溫和，能見度可達20米，珊瑚礁間棲息成群珊瑚魚，適合微距攝影與初學者。',{depth:'12-15m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S("Ernie's Cave",13.51,120.94,'中級','鯊魚','low','以已故巨型石斑魚「厄尼」命名的雙洞穴系統，覆蓋硬珊瑚與海綿，中等洋流，偶遇礁鯊巡遊。',{depth:'22-27m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Pink Wall',13.52,120.97,'初級','','low','東南角懸垂岩壁覆蓋粉色軟珊瑚群，漲潮時能見度最佳，建議攜帶紅光手電觀察夜行生物。',{depth:'10-18m',current:'弱',source:'菲律賓潛水指南 2025.10'}),
+    S('The Washing Machine (PG)',13.5,120.96,'高級','海龜','low','峽谷地形形成多向強流，潛水員如衣物般被翻滾沖洗，僅限經驗豐富者，需導潛陪同。',{depth:'15-25m',current:'極強',source:'菲律賓潛水指南 2025.10'}),
+    S('Shark Cave (PG)',13.49,120.95,'中級-高級','鯊魚、海狼群','low','30米長的岩棚是鯊魚日間休息站，洋流強勁時魚群如帷幕展開，需選平潮期潛水。',{depth:'18-30m',current:'中等',source:'菲律賓潛水指南 2025.10'})
+  ],
+  oslob:[
+    S('Whale Shark Encounter',9.466,123.388,'初級','鯨鯊','high','圈養投餵的互動點，潛水員或浮潛者可與鯨鯊同遊，生態友好度有限，建議理性選擇，早晨6-8點抵達為佳。',{depth:'5-10m',current:'弱',source:'菲律賓潛水指南 2025.10'})
+  ],
+  malapascua:[
+    S('Monad Shoal',11.45,124.18,'高級','鯊魚','high','全球唯一穩定觀測長尾鯊的淺灘，水下平台是長尾鯊的清潔站，兩天內幾乎保證看到長尾鯊。',{depth:'25-30m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Gato Island',11.4,124.08,'中級','鯊魚','medium','白鰭礁鯊、海蛇、洞穴系統，可穿越洞穴，有鯊魚守護區。',{depth:'5-20m',current:'中等',source:'菲律賓潛水指南 2025.10'}),
+    S('Calanggaman Island',11.41,124.32,'中級','海狼群','low','峭壁潛水與海狼風暴，白沙島上岸休息甚佳。',{depth:'10-30m',current:'中等',source:'菲律賓潛水指南 2025.10'})
+  ],
+  kenting:[
+    S('Wanlitong',22.02,120.69,'初級','','high','墾丁最受歡迎的岸潛點，海況平穩適合新手，珊瑚豐富、熱帶魚群與軟珊瑚，位於墾丁西海岸。',{depth:'5-18m',current:'弱',source:'台灣潛水指南 2025.10'}),
+    S('Houbihu',21.95,120.74,'中級','海龜','high','重要的漁港潛點，生物多樣性高，海龜、隆頭魚、石斑魚常見，也是前往蘭嶼的碼頭。',{depth:'8-25m',current:'中等',source:'台灣潛水指南 2025.10'}),
+    S('Nanwan',21.96,120.77,'初級','','high','受保護的海灣，海況穩定，適合訓練和攝影，珊瑚魚群、海葵、蟹類豐富。',{depth:'6-20m',current:'弱',source:'台灣潛水指南 2025.10'}),
+    S('Hongchaikeng',21.96,120.71,'中級','','medium','岩礁地形複雜，大魚較多（巨型石斑魚、鸚鵡魚、海鰻），適合有經驗的潛水員。',{depth:'10-30m',current:'中等',source:'台灣潛水指南 2025.10'})
+  ],
+  greenisland:[
+    S('Shilang',22.66,121.47,'初級','海龜','high','綠島最著名的潛水步道，軟珊瑚豐富，海龜常見，適合初學者，位於綠島西海岸。',{depth:'5-21m',current:'弱',source:'台灣潛水指南 2025.10'}),
+    S('Dabaisha',22.63,121.51,'中級','海龜','high','白沙海灘前的礁區，地形變化大，生物豐富，珊瑚礁魚類與海扇聖地，位於綠島南部。',{depth:'8-25m',current:'中等',source:'台灣潛水指南 2025.10'}),
+    S('Chaikou',22.67,121.5,'中級','海龜','high','較深的潛點，海龜聚集地，軟珊瑚豐富，適合進階潛水員，位於綠島北部。',{depth:'10-30m',current:'中等',source:'台灣潛水指南 2025.10'}),
+    S('Haishenping',22.65,121.5,'初級','','medium','珊瑚種類豐富（角菊珊瑚、穗珊瑚、腦珊瑚），適合浮潛與初級潛水，位於綠島東海岸。',{depth:'3-15m',current:'弱',source:'台灣潛水指南 2025.10'}),
+    S('Underwater Hot Spring',22.65,121.51,'中級','','high','世界稀有的海底溫泉（朝日溫泉），獨特的地質奇觀，耐熱生物棲息地，全球僅三處海底硫磺溫泉之一。',{depth:'10-20m',current:'弱',source:'台灣潛水指南 2025.10'})
+  ],
+  orchidisland:[
+    S('Badai Bay',22.04,121.55,'中級','海龜','high','蘭嶼南部潛點，達悟族傳統水域，珊瑚礁與熱帶魚群豐富，受黑潮影響能見度佳，位於蘭嶼主要部落附近。',{depth:'5-30m',current:'中等',source:'台灣潛水指南 2025.10'})
+  ],
+  xiaoliuqiu:[
+    S('Vase Rock',22.349,120.365,'中級','海龜','medium','小琉球地標性潛點，海域寬廣，常見海龜在此進食，深處魚群與多種珊瑚魚，可進行放流潛水從美人洞一路漂流到此上岸。',{depth:'5-20m',current:'中等',source:'小琉球潛點多方交叉比對 2025'}),
+    S('Beauty Cave',22.352,120.36,'初級','海龜','medium','小琉球所有潛點中海龜數量最多的地點，海域寬廣，水域安全，適合浮潛與體驗潛水。',{depth:'5-18m',current:'弱',source:'小琉球潛點多方交叉比對 2025'}),
+    S('Houshi Reef',22.322,120.378,'初級','海龜','medium','位於小琉球南端，海底可見如山脈般厚實珊瑚岩石，冬天前往可避開北浪，上下岸容易，適合新手。',{depth:'5-10m',current:'弱',source:'小琉球潛點多方交叉比對 2025'}),
+    S('Shanfu Wreck',22.335,120.358,'中級','海龜','low','沉船斷裂成船頭與船身兩部分，位於16-18米深沙質地形與岩盤交界處，沿途可見多種小魚、海龜常棲息於此。',{depth:'16-18m',current:'中等',source:'小琉球潛點多方交叉比對 2025'}),
+    S('Lobster Cave',22.335,120.388,'中級','','low','兩旁一望無際的軟珊瑚地毯，也見大型貝類、海星、多種熱帶魚類，地形起伏較大，新手需注意浮力控制。',{depth:'10-15m',current:'中等',source:'小琉球潛點多方交叉比對 2025'}),
+    S('Iron Reef',22.33,120.392,'中級-高級','','low','人工魚礁潛點，共四座傳統戶型造型魚礁，因能見度較低得名，離岸較遠需注意氣量與減壓時間，容易遇中強流。',{depth:'20-32m',current:'強',source:'小琉球潛點多方交叉比對 2025'})
+  ],
+  northeastcoast:[
+    S('Longdong No.4',25.1128,121.9159,'中級','','medium','龍洞灣內最著名的微距潛點，被稱為台灣版縮小藍碧海峽，地形從岩區到沙地一應俱全，數百種魚類、多種稀有小型生物均有紀錄。',{depth:'5-27m',current:'弱',source:'東北角潛點多方交叉比對 2025'}),
+    S('82.5K',25.13,121.925,'中級-高級','','medium','位於南雅奇岩附近，以多種稀有海兔類聞名，是水下攝影大師常前往拍攝的地點，也可見到大型蟹類。',{depth:'10-25m',current:'中等',source:'東北角潛點多方交叉比對 2025'}),
+    S('Chaojing Park',25.155,121.8,'中級','','low','基隆八斗子漁港旁的海洋保護區，生態保護得宜，常見大型海扇與各種小型生物，高氧認證者可進行進階深潛。',{depth:'10-25m',current:'中等',source:'東北角潛點多方交叉比對 2025'}),
+    S('Longdong Bay Park',25.11,121.915,'初級','','low','龍洞灣內的基礎潛點，地形平緩安全，適合初階教學與初學者，珊瑚花園與彩色魚群常見。',{depth:'5-20m',current:'弱',source:'東北角潛點多方交叉比對 2025'}),
+    S('Fanzaiao',25.13,121.825,'中級','','low','天然海灣地形，每年初春成為幼魚孵育場，吸引許多迴游性魚類靠岸，需攜帶潛水刀以備不時之需。',{depth:'8-22m',current:'中等',source:'東北角潛點多方交叉比對 2025'})
+  ],
+  penghu:[
+    S('Lavender Forest',23.2436,119.6667,'初級','','medium','南方四島最知名也最夢幻的潛點，水深僅有3-5米、無流，大片紫色珊瑚覆蓋海底，如同海底紫色花園，適合浮潛拍攝。',{depth:'3-5m',current:'弱',source:'澎湖潛點多方交叉比對 2025'}),
+    S('Xiji Blue Cave',23.22,119.66,'中級-高級','','low','水流帶動海水呈現神秘藍色光彩，被稱為澎湖版藍洞，只有小型遊艇能進入，需與經驗豐富的船長協調行程。',{depth:'5-15m',current:'中等',source:'澎湖潛點多方交叉比對 2025'}),
+    S('Xiji Fault',23.215,119.655,'高級','','low','玄武岩地形構成的壁面斷層，地貌變化大，適合進階潛水員探索，周邊珊瑚覆蓋率高。',{depth:'10-30m',current:'強',source:'澎湖潛點多方交叉比對 2025'}),
+    S('Lingyun Warship',23.2003,119.4356,'中級-高級','','low','退役軍艦妥善處理後沉入海底，廣大空間提供海洋生物棲息、繁殖及避敵的場所，位於七美島外海。',{depth:'10-30m',current:'中等',source:'澎湖潛點多方交叉比對 2025'}),
+    S('Underwater Mailbox',23.5333,119.5667,'初級','','medium','位於鎖港杭灣的家庭式淺水潛點，珊瑚礁清澈見底，可見熱帶魚與各種小型生物，潛水員可將明信片投入海底郵筒。',{depth:'3-10m',current:'弱',source:'澎湖潛點多方交叉比對 2025'})
+  ],
+  ishigaki:[
+    S('川平石崎 Manta Scramble',24.472,124.128,'初級','蝠鲼','medium','石垣島西北角著名蝠鲼清潔站，水深僅3-20公尺、水流平緩，遭遇率號稱全球數一數二，初學者也能參與，5-11月為主要季節，9-10月數量最多。',{depth:'3-20m',source:'日本潛水網站資料交叉比對'}),
+    S('屋良部崎 Yarabu Point',24.446,124.116,'中級','','medium','位於川平灣西側的岬角，地形以花崗岩礁石與通道為主，潮流變化大，能見度佳，是石垣島西岸熱門的中階潛點。',{current:'中等',source:'日本潛水網站資料交叉比對'}),
+    S('川平灣 Kabira Bay',24.4547,124.1447,'初級','','high','石垣島最著名景點之一，米其林三星評等的翡翠海灣，擁有超過300種珊瑚與上千種熱帶魚，灣內因潮流強勁禁止自由游泳，潛水活動多在灣口周邊海域進行。',{source:'Wikipedia + 日本觀光局資料'}),
+    S('白保珊瑚礁 Shiraho Reef',24.33,124.257,'初級','','medium','石垣島東岸機場旁的珊瑚礁海域，擁有日本規模最大的桌形青珊瑚群落，生態豐富，是重要的生態保育與研究地點。',{source:'日本潛水網站資料交叉比對'})
+  ],
+  miyako:[
+    S('通池 Toori Ike',24.7343,125.2611,'中級','','high','下地島上的雙連石灰岩天然池，經地下水道與海洋相通，是宮古島最具代表性的地形潛點，池水呈現罕見的漸層藍，適合探索地底通道。',{source:'日本潛水網站資料交叉比對'}),
+    S('Antonio Gaudi',24.75,125.2,'中級-高級','','low','宮古島西岸的洞穴地形潛點，鐘乳石般的岩柱與拱形通道交錯，因結構神似高第建築風格而得名，透明度極佳，屬中高階地形潛水路線。',{source:'日本潛水網站資料交叉比對'}),
+    S('魔王的宮殿 King\'s Palace',24.755,125.195,'中級-高級','','low','宮古島著名地形潛點，由多層拱門與水道構成宮殿般的空間感，光線穿透形成夢幻光柱，是地形潛水愛好者必訪之地。',{source:'日本潛水網站資料交叉比對'}),
+    S('Yabiji 潛點群',24.913,125.317,'中級','','medium','宮古島以北的日本規模最大集合式潛點群，退潮時大片石塔地形露出海面形成奇特景觀，潮間帶生態豐富，僅能透過船潛前往。',{depth:'4-8月最佳',source:'日本潛水網站資料交叉比對'})
+  ],
+  okinawamain:[
+    S('青之洞窟 Blue Cave',26.5028,127.7469,'初級','','high','沖繩本島最著名的潛水景點，洞穴內因光線折射呈現夢幻藍光，適合各級潛水員與浮潛客，全年遊客不斷。',{source:'Wikipedia + 日本觀光局資料'}),
+    S('慶良間諸島 Kerama Islands',26.17,127.28,'中級','海龜','medium','距那霸船程約50分鐘的國家公園海域，以「慶良間藍」透明度聞名世界，海龜遭遇率高，珊瑚覆蓋率完整，是沖繩船潛首選。',{source:'日本潛水網站資料交叉比對'}),
+    S('砂邊 Sunabe',26.316,127.755,'初級','','medium','沖繩本島中部知名岸潛點，長堤護岸下方遍布珊瑚礁與豐富微距生物，交通便利，是當地潛水員的日常潛點。',{source:'日本潛水網站資料交叉比對'})
+  ],
+  northgbr:[
+    S('鱈魚洞 Cod Hole',-14.6833,145.6333,'中級','','medium','以巨型馬鈴薯石斑魚聞名，魚體可達1.5米，潛水員可近距離接觸這些友善的大型魚類，是大堡礁最具代表性的潛點之一，僅能透過船宿抵達。',{depth:'28m',source:'澳大利亞潛水指南 2025.10'}),
+    S('魚鷹礁 Osprey Reef',-13.8833,146.5667,'高級','鯊魚、錘頭鯊、海龜','medium','珊瑚海中的孤立礁盤，以洄游鯊魚群和清澈能見度著稱，北角是著名的鯊魚餵食點，錘頭鯊出沒頻繁，能見度常超過40米。',{depth:'40m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  centralgbr:[
+    S('水下藝術博物館 MOUA',-18.6167,147.0667,'初級','海龜','low','全球首個水下雕塑博物館，位於湯斯維爾外海的約翰布魯爾礁，展出多件人形雕塑已成為珊瑚生長基質，結合藝術與生態保育，海龜常見。',{depth:'18m',source:'澳大利亞潛水指南 2025.10'}),
+    S('揚加拉號沉船 SS Yongala',-19.3083,147.6167,'高級','海龜、鯊魚、蝠鲼','high','1911年沉沒的客輪，船體保存完整達109米長，是澳洲最著名的沉船潛點，船身覆滿珊瑚和海洋生物，需具備進階沉船潛水資格，水流較強。',{depth:'28m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  southgbr:[
+    S('赫倫島 Heron Island',-23.4417,151.9133,'初級','海龜、鯊魚','high','南部大堡礁的珊瑚礁石，赫倫島是著名的海龜築巢地，礁盤周圍珊瑚健康，黑鰭礁鯊常見，適合初學者及有經驗的潛水員，岸潛即可直達礁盤。',{depth:'22m',source:'澳大利亞潛水指南 2025.10'}),
+    S('伊麗特女士島 Lady Elliot Island',-24.1133,152.7167,'中級','蝠鲼、海龜、鯊魚','high','大堡礁最南端的珊瑚礁島，以蝠鲼聞名全球，全年均可見，亦是重要的海龜和海鳥繁殖地，珊瑚覆蓋率高，清潔站活躍。',{depth:'30m',source:'澳大利亞潛水指南 2025.10'}),
+    S('馬斯格雷夫女士島 Lady Musgrave Island',-23.9167,152.3833,'初級','蝠鲼、海龜、鯊魚','high','南部大堡礁的環礁湖島，水質清澈，適合浮潛和潛水，蝠鲼和海龜出沒頻繁，珊瑚生態豐富，是家庭友善的潛水目的地。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  stradbroke:[
+    S('曼塔礁石 Manta Bommie',-27.5167,153.55,'中級','蝠鲼、海龜','low','位於南史特拉布羅克島附近的礁石，因蝠鲼聚集而得名，蝠鲼在此清潔站定期光顧，是昆士蘭東南部觀賞蝠鲼的最佳地點之一。',{depth:'22m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  ningaloo:[
+    S('寧格魯礁 Ningaloo Reef',-22.7,113.7,'初級','鯨鯊、蝠鲼、海龜、鯊魚','medium','世界遺產珊瑚礁，緊鄰海岸線，無需船隻可直接從岸邊入水。每年3-7月鯨鯊季節，可與世界最大魚類共游，座頭鯨（6-10月）和蝠鲼亦常見。',{depth:'30m',source:'澳大利亞潛水指南 2025.10'}),
+    S('海軍碼頭 Navy Pier',-21.8017,114.165,'中級','鯊魚、海龜','high','被譽為澳洲最佳碼頭潛水，位於Exmouth海軍基地，碼頭橋柱覆滿珊瑚和海綿，棲息著豐富的魚類，夜潛更為精彩，需提前預約持牌潛導。',{depth:'14m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  rowleyshoals:[
+    S('羅利淺灘 Rowley Shoals',-17.3,119.35,'高級','鯨鯊、蝠鲼、鯊魚、海龜、錘頭鯊','medium','西澳外海三個孤立環礁，珊瑚覆蓋率達90%以上，被稱為「澳洲最後的荒野」，能見度超過60米，大型洄游魚類、鯊魚群聚集，僅能乘船抵達，放流潛水盛行。',{depth:'40m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  christmasisland:[
+    S('飛魚灣 Flying Fish Cove',-10.4245,105.6793,'初級','鯊魚','medium','岸潛聖地，可見90%的島上魚類，牆體加珊瑚花園，適合新手，是島上最主要的岸潛地點，從岸邊下水即可觀察豐富的珊瑚和魚類生態。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'}),
+    S('椰子灘 Coconut Point',-10.41,105.67,'中級','','low','強勁水流的漂流潛點，珊瑚花園、海扇和大型魚群頻繁出沒，沿著岩壁漂流前進，水流較強需要經驗，能見度良好。',{depth:'16m',source:'澳大利亞潛水指南 2025.10'}),
+    S('墓地 The Cemetery',-10.43,105.68,'初級','','low','靠近老舊墓園的珊瑚潛點，珊瑚與成群魚類豐富，新手友善，地點水況安靜，水流小，適合岸潛入門或夜潛。',{depth:'14m',source:'澳大利亞潛水指南 2025.10'}),
+    S('太平間 The Morgue',-10.45,105.65,'中級','鯊魚、裸鰓類','low','夜潛微距天堂，獅子魚和各種小型生物在夜間活躍，名稱雖然聽起來比較深沉，實際上是形容此處生物夜間潛伏的狀態，是島上生態攝影的熱門地點。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'}),
+    S('潛水艇礁 Submarine Rock',-10.48,105.6,'中級','','low','形狀如潛水艇的岩石，覆滿珊瑚及大型魚群，與鄰近潛點相連，可結合兩個潛點一次探索，是聖誕島經典的中層潛水體驗。',{depth:'20m',source:'澳大利亞潛水指南 2025.10'}),
+    S('雷崖洞穴 Thundercliff Cave',-10.5,105.6,'中級-高級','蝠鲼','low','大型空氣洞穴，鐘乳石景觀壯觀，蝠鲼有時在洞穴入口出沒，大型魚群常在此聚集，洞穴內有氣穴可供浮出水面換氣，是島上壯觀絕倫的自然景觀。',{depth:'22m',source:'澳大利亞潛水指南 2025.10'}),
+    S('刑天壁 Perpendicular Wall',-10.52,105.62,'高級','蝠鲼、鯨鯊','low','垂直牆體，巨型海扇、蝠鲼和大型魚類在此出沒，牆體上覆滿海綿和珊瑚，能見度極佳，是聖誕島最壯觀的進階潛點，稀有魚類常在此現蹤。',{depth:'40m',source:'澳大利亞潛水指南 2025.10'}),
+    S('水面浮標 Fuel Buoys',-10.42,105.68,'初級','','low','浮標周邊魚群聚集，珊瑚密集，浮標基座已成為小型生態系統，小型熱帶魚群在此棲息，是輕鬆的岸潛與淺水組合體驗。',{depth:'30m',source:'澳大利亞潛水指南 2025.10'}),
+    S('豬岩 Egeria Point',-10.55,105.63,'中級','鯊魚','low','魚群豐富，能見度極佳，地點位於島岸外海的進階潛點，大型海洋魚類在此穿梭，地形特殊造就活躍的海洋生態環境。',{depth:'22m',source:'澳大利亞潛水指南 2025.10'}),
+    S('萎安跳 Leanne\'s Leap',-10.48,105.61,'中級','','low','與這顆岩石相連通，珊瑚花園和魚群豐富，潛點景色活躍，魚類多樣，適合一次合併探索的輕鬆中層潛水體驗。',{depth:'10m',source:'澳大利亞潛水指南 2025.10'}),
+    S('瀑布灣 Waterfall Bay',-10.45,105.64,'中級','海龜','low','壁面和海龜常見，水流平緩輕鬆適合放流潛水，魚群常在此聚集，海龜在壁面縫隙休息，景色令人印象深刻。',{depth:'20m',source:'澳大利亞潛水指南 2025.10'}),
+    S('伊瑟爾海灘 Ethel Beach',-10.52,105.61,'初級','','low','從海邊漸漸變深的岸潛天堂，巨型蘇眉魚和各種熱帶魚在此棲息，入水方便，珊瑚覆蓋豐富，是島上最友善的岸潛點之一。',{depth:'14m',source:'澳大利亞潛水指南 2025.10'}),
+    S('百萬富翁 Millionaire\'s Bommie',-10.47,105.62,'中級','','low','巨大岩塔，周圍熱帶魚群成群聚集，岩塔表面覆滿珊瑚和海綿，魚類豐富多樣，是聖誕島最具代表性的潛點之一。',{depth:'18m',source:'澳大利亞潛水指南 2025.10'}),
+    S('白灘洞穴 West White Beach Cave',-10.53,105.62,'中級','','low','彩色洞穴，珊瑚覆蓋，適合輕鬆下潛，洞穴內壁面覆滿彩色軟珊瑚和海綿，適合潛水攝影和探索小巧精緻的洞穴環境。',{depth:'18m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  cocosislands:[
+    S('Broccoli Patch 花菜潛點',-12.1667,96.8333,'初級','海龜、鯊魚','low','大片健康珊瑚群落，海龜、護士鯊和海豚常見，澳大利亞領地第二大珊瑚礁系統中的代表潛點，適合各級潛水員。',{depth:'10m',source:'澳大利亞潛水指南 2025.10'}),
+    S('企業號 Enterprise',-12.15,96.85,'高級','鯊魚','low','礁壁與垂直斷崖，鯊魚、金槍魚和大型魚群大量聚集，地形從珊瑚平台一路延伸至深海斷崖，適合進階潛水員。',{depth:'35m',source:'澳大利亞潛水指南 2025.10'}),
+    S('兩個洞穴 Two Caves',-12.18,96.83,'中級','','low','沉船與珊瑚洞穴結合的潛點，可見各種海洋生物和大型魚群，沉船已成為珊瑚生長基質，內外洞穴用不同深度提供多樣的潛水體驗。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'}),
+    S('白菜園 Cabbage Patch',-12.2,96.82,'中級','鯊魚','low','森林般的白菜珊瑚（Cabbage Coral）密集聚集，彩色熱帶魚和護士鯊在此棲息，層疊的珊瑚結構創造出獨特景觀，高珊瑚覆蓋率是科科斯群島的代表性生態。',{depth:'27m',source:'澳大利亞潛水指南 2025.10'}),
+    S('蝠鲼清潔站 Manta Service Station',-12.13,96.9,'初級','蝠鲼','low','蝠鲼專屬清潔站，潛水員可近距離觀察蝠鲼接受清潔魚服務的全過程，水深極淺，適合各級潛水員和水下攝影，是觀賞蝠鲼的絕佳地點。',{depth:'9m',source:'澳大利亞潛水指南 2025.10'}),
+    S('格哈德炮點 Gerhard Cannon Site',-12.155,96.835,'初級','','low','港灣入口的沉船遺址，考古潛水體驗，沉船殘骸和德國大砲保存良好，是科科斯獨特的歷史潛水體驗，周圍珊瑚生態豐富。',{depth:'12m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  portlincoln:[
+    S('海王星群島 Neptune Islands',-35.25,136.1,'高級','鯊魚','medium','南澳最著名的大白鯊觀賞地，大白鯊全年可見，以秋冬季最為頻繁，提供籠潛（cage diving）體驗，潛水員可安全近距離觀察大白鯊，並有海獅群棲息。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  whyalla:[
+    S('懷阿拉巨型烏賊 Whyalla Giant Cuttlefish',-33.0333,137.5833,'初級','','high','全球唯一的澳洲巨型烏賊（Sepia apama）大規模聚集地，每年5-8月可見數千隻烏賊在此交配繁殖，創造壯觀的自然奇觀，烏賊在水下近距離觀賞，水深極淺。',{depth:'10m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  mtgambier:[
+    S('基爾斯比天坑 Kilsby Sinkhole',-37.8333,140.8333,'高級','','medium','南澳甘比爾山附近的淡水天坑，以極度清澈的藍色水體著稱，能見度超過60米，陽光照射時形成震撼光柱，是世界級的洞穴潛水目的地，需洞穴潛水執照。',{depth:'64m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  lordhowe:[
+    S('豪勳爵島 Lord Howe Island',-31.55,159.0833,'中級','海龜','medium','五股主要洋流交匯的國際知名保護地點，擁有60多個潛點，島上同時最多僅允許400人，可探索Ball\'s Pyramid的魚群以及珊瑚礁的洞穴和拱門，某些魚類為當地獨有物種。',{depth:'40m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  jervisbay:[
+    S('傑維斯灣 Jervis Bay',-35.1333,150.7167,'初級','鯊魚','medium','位於悉尼附近，擁有30多個潛點，含礁石、陡坡、海藻林和海綿花園，水晶般清澈的海水是觀察鯊魚、海豹和各種微距生物的絕佳地點，包括葉形海龍、海馬和各種小型軟體動物，廣角和微距攝影樂園。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  southwestrocks:[
+    S('魚岩洞穴 Fish Rock Cave',-30.8833,153.05,'高級','鯊魚、海龜','high','西南岩最著名潛點，以自然採光的洞穴和豐富海洋生物聞名，是重要鯊魚物種的聚集地，9-10月可見大型頭足類在洞穴周圍活動，需廣角鏡頭，是流行的潛水攝影天堂，常有當地潛導帶領探索。',{depth:'24m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  byronbay:[
+    S('朱利安礁海洋公園 Julian Rocks',-28.65,153.65,'中級','鯊魚、海龜、蝠鲼','high','距拜倫灣2.5公里的海洋公園，冷暖水流交匯，熱帶和冷水物種在此處混合，冬季可見灰護士鯊（Grey Nurse Shark），夏季可見豹鯊和蝠鲼，5-9月可從潛水船觀看大型海洋哺乳類動物，各種熱帶魚類亦常見。',{depth:'25m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  merimbula:[
+    S('梅林布拉 Merimbula',-36.8833,149.9,'初級','翻車魚','medium','位於悉尼和墨爾本中途的海岸地區，擁有三艘沉船（SS Empire Gladstone、Tasman Hauler、Henry Bolte），深度在10-26米之間，沉船上聚集豐富的海洋生物，冬季可能遇到翻車魚（Sunfish）和大型海洋哺乳類動物。',{depth:'26m',source:'澳大利亞潛水指南 2025.10'})
+  ],
+  phuket:[
+    S('國王沉船 King Cruiser Wreck',7.86,98.62,'中級','','high','1997年沉沒的汽車渡輪，覆蓋紅色軟珊瑚，巨型魚類巢穴，獅子魚群。位於普吉與皮皮島之間。需AOW認證＋深潛專長。',{depth:'12-30m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('鯊魚角（普吉）Shark Point',7.82,98.62,'中級','鯊魚','high','三座花崗岩尖峰，小型鯊魚清潔站。有海鱔洞穴與紫色海扇森林。位於普吉與皮皮島之間。',{depth:'10-25m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('小皇帝島 Koh Racha Yai',7.62,98.36,'初級','海龜','high','白沙地斜坡珊瑚花園，霓虹雀鯛風暴，海龜巡遊，夜潛生物豐富。適合初學者與體驗潛水。',{depth:'5-20m',current:'弱',source:'泰國潛水指南 2025.10'}),
+    S('小拉差島 Racha Noi',7.42,98.35,'中級-高級','豹紋鯊、蝠鲼','medium','普吉島南方的無人島，位於大拉差島（Racha Yai）更南邊。海底巨石堆疊形成壯觀地形，風景似斯米蘭群島。南端可遇豹紋鯊、大型魚群、蝠鲼。',{depth:'5-40m',current:'中強',source:'泰國潛水多方網站交叉比對 2026-07-18'})
+  ],
+  kohtao:[
+    S('西南尖峰 Southwest Pinnacle',9.93,99.72,'中級-高級','鯨鯊','medium','花崗岩巨礁，鯨鯊高頻出沒點。成群梭魚與蝠鲼。位於涵尾島西南，需深潛認證。',{depth:'15-35m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('白岩 White Rock',10.08,99.85,'初級','豆丁海馬、章魚','medium','夜間潛水聖地。豆丁海馬、瓷蟹、藍環章魚棲息地。多層珊瑚礁，適合考證訓練與生物辨識練習。',{depth:'5-28m',current:'弱',source:'泰國潛水指南 2025.10'}),
+    S('帆岩 Sail Rock',9.83,99.65,'中級','','high','泰國灣地標。垂直岩壁空心通道穿越體驗，巨型海扇、傑克魚風暴，梭魚群。涵尾島與Koh Samui中間。',{depth:'5-30m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('涵尾尖峰 Chumphon Pinnacle',10.1715,99.7784,'高級','鯨鯊','high','涵尾島西北邊的花崗岩巨石，當地最受歡迎的潛點，與帆岩並列為涵尾島兩大明星。魚群密度極高，大型魚類、傑克魚群聚集。鯨鯊目擊紀錄極高，這裡是涵尾島所有潛點中最受歡迎的。',{depth:'14-40m',current:'中強',source:'泰國潛水多方網站交叉比對 2026-07-18'})
+  ],
+  krabiphiphi:[
+    S('比達洞 Bida Nok',7.66,98.77,'中級','鯊魚','high','皮皮島群明星潛點。豹紋鯊、大型魚群、巨型海扇。垂直岩壁與隧道多變地形。',{depth:'10-30m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('鯊魚角（皮皮）Shark Point',7.71,98.69,'中級','鯊魚','medium','小型鯊魚清潔站、彩色海鱔。一日3潛行程主要潛點（從皮皮島出發1.5h）。',{depth:'10-25m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('Hong Lagoon 洪島潛點',8.1,98.83,'初級','','low','翡翠色寧靜水域，幼鯊、螢光珊瑚常見。半日浮潛加水下呼吸器潛水組合行程。',{depth:'5-15m',current:'弱',source:'泰國潛水指南 2025.10'}),
+    S('比達內 Koh Bida Nai',7.665,98.775,'中級','海龜','medium','比達洞（Bida Nok）的姐妹島，位於北邊。北側垂直壁面覆蓋健康珊瑚，東南邊有魚群穿梭的地形通道。小型鯊魚、海龜常見，幸運時可遇鯨鯊。',{depth:'5-30m',source:'泰國潛水多方網站交叉比對 2026-07-18'})
+  ],
+  khaolaksimilan:[
+    S('黎希留岩 Richelieu Rock',9.36,97.83,'高級','鯨鯊、蝠鲼','high','全球20佳潛點。馬蹄形岩礁，強流通道。鯨鯊目擊率80%（3-6月）、蝠鲼60%。需船宿可達。',{depth:'10-35m',current:'強',source:'泰國潛水指南 2025.10'}),
+    S('象頭岩 Elephant Head Rock',8.6,97.62,'高級','','high','水下巨石迷宮，大型魚類目擊率70%。犬齒金槍魚群。斯米蘭明星潛點之一。',{depth:'15-40m',current:'強',source:'泰國潛水指南 2025.10'}),
+    S('伊甸園東 East of Eden',8.66,97.65,'中級','海龜','medium','白沙地珊瑚花園。海龜、拿破崙魚常見。輕鬆休閒潛水點，適合作為船宿進階潛之間的緩衝點。',{depth:'5-25m',current:'弱',source:'泰國潛水指南 2025.10'}),
+    S('庫本島 Koh Bon',8.83,97.65,'中級-高級','蝠鲼、豹紋鯊','low','斯米蘭國家公園北方的孤立小島，西側垂直壁面及尖峰是全泰國最知名的蝠鲼清潔站，目擊率高。也可遇豹紋鯊、大型魚群、偶現鯨鯊。',{depth:'5-45m',current:'中強',source:'泰國潛水多方網站交叉比對，座標依斯米蘭相對位置估算 2026-07-18'})
+  ],
+  kohlipe:[
+    S('8英里礁 8 Mile Rock',6.65,99.2,'高級','鯊魚、海狼群','low','深海斷崖，長尾鯊（清晨）、梭魚龍捲風。麗貝島明星潛點，需深潛認證。',{depth:'25-40m',current:'強',source:'泰國潛水指南 2025.10'}),
+    S('石島 Stonehenge',6.5,99.32,'中級','','low','花崗岩群結成的潛點，有小型毒魚和各種擬態生物棲息。地形複雜有趣。',{depth:'18-30m',current:'中等',source:'泰國潛水指南 2025.10'}),
+    S('海葵礁 Anemone Reef',6.48,99.28,'初級','豆丁海馬','low','巨型海葵集合地，小丑魚巢穴，豆丁海馬。適合初學者與微距攝影。',{depth:'10-20m',current:'弱',source:'泰國潛水指南 2025.10'}),
+    S('Koh Yang',6.65,99.25,'初級','','low','Koh Lipe北方的小島，以軟珊瑚之美聞名，被當地潛店評為最適合全面探索的潛點之一。天使魚、海鱔、小型甲殼類常見，適合初學者與進階潛水員。',{depth:'5-25m',source:'泰國潛水多方網站交叉比對 2026-07-18'})
+  ],
+  rockislands:[
+    S('藍角 Blue Corner',7.133611,134.220278,'高級','鯊魚、海龜','high','帛琉最著名的潛點，也是許多潛水雜誌評選的全球最佳潛點。三角形礁盤插入開闊海域，強勁潮流帶來豐富洋流，引來大量鯊魚、大型魚群與海龜，需使用專用工具固定在礁盤上觀察。',{depth:'8-30m',current:'強',source:'Wikipedia、PADI、Palau Dive Adventures 2026-07-21'}),
+    S('德國水道 German Channel',7.12722,134.28417,'中級','蝠鲼','high','帛琉礁層西南側的人工水道，連接內海域與太平洋，是著名的蝠鲼清潔站，潛水員可在水道入口附近觀察蝠鲼接受清潔魚服務。',{depth:'3-40m',source:'Wikipedia、PADI 2026-07-21'}),
+    S('藍洞 Blue Holes',7.138881,134.226,'中級-高級','','high','帛琉最早被發現的潛點之一，礁頂四個天然孔洞通往一個巨大洞穴，深處有通往更深層洞穴「惡魔寺」的狹窄入口，需專門設備才能進入。',{depth:'26-42m',source:'petelepage.com、PADI 2026-07-21'}),
+    S('水晶燈洞 Chandelier Cave',7.32,134.47,'初級','','medium','位於Malakal島的深層地下淡水洞穴系統，潛水員從水下入口進入後可浮出區域內四個充滿空氣的洞穴，洞內鐘乳石美如燈飾，無需洞穴潛水專門認證，適合所有潛水員。',{depth:'5-15m',source:'多家潛水旅遊網站交叉比對，坐標依Malakal島位置估算 2026-07-21'}),
+    S('烏隆水道 Ulong Channel',7.35,134.38,'中級-高級','鯊魚','medium','位於Ulong島西側屏障礁的深水道，沙底深度僅13米，兩側斜坡生態豐富。潛水員先固定觀察小型鯊魚，鬆開後水流將潛水員帶過水道，可見鬼頭刀魚、Batfish魚群，水道盡頭有廣大的高麗菜珊瑚集群。',{depth:'13-20m',current:'強',source:'dive-the-world.com、solitude.world 2026-07-21'}),
+    S('賽亞斯隧道 Siaes Tunnel',7.145,134.21,'高級','','low','位於Ngemelis礁系統的進階潛點，一座垂直地下隧道連接淺水礁頂與深水壁面，適合與藍角與藍洞合併探索，常見小型鯊魚、大型魚群與強勁洋流。',{depth:'10-40m',current:'強',source:'beunderwater.com 2026-07-21'}),
+    S('大斷崖 Big Drop-off',7.148,134.218,'高級','鯊魚','low','Ngemelis礁系統中最壯觀的垂直壁面之一，從淺水礁頂垂直落至深海，壁面覆蓋大型海扇與硬珊瑚，常見鯊魚、大型魚群在開闊海域中巡遊。',{depth:'10-40m+',current:'強',source:'beunderwater.com 2026-07-21'}),
+    S('水母湖 Jellyfish Lake',7.16111,134.37611,'初級','','high','帛琉最著名的自然景觀之一，海水湖中棲息著數百萬只金黃水母，因進化失去刺胞本能，可與人安全接觸。注意：此處屬於浮潛景點，禁止SCUBA潛水，深層湖水含硫化氫氣體有危險性；2025年起金黃水母數量因氣候因素明顯減少，造訪前建議先確認最新狀態。',{depth:'0-12m（僅限浮潛層）',current:'弱',source:'Wikipedia、Coral Reef Research Foundation 2026-07-21'})
+  ],
+  peleliu:[
+    S('貝里琉之牆 Peleliu Wall',6.98,134.23,'高級','鯊魚','medium','貝里琉島南側礁區的世界級垂直壁面潛點，以軟珊瑚與海扇花園聞名。頂部礁盤從10米逐漸下降至30米，強勁海流帶來白尖鯊、小型鯊魚等大量魚類，需專用工具固定觀察。',{depth:'10-30m',current:'強',source:'PADI、Palau Dive Adventures 2026-07-21'}),
+    S('貝里琉快車道 Peleliu Express',6.965,134.24,'高級','鯊魚','low','貝里琉島南側的垂直壁面，因潮汐流速快如快車而得名。海流會在南端與貝里琉水道匯流，形成帛琉最強勁的洋流，可見大型魚群、鬼頭刀魚、魚類風暴，僅限進階潛水員。',{depth:'10-40m',current:'極強',source:'Palau Dive Adventures、Dolphin Bay Resort 2026-07-21'}),
+    S('貝里琉水道 Peleliu Cut',6.975,134.225,'高級','','low','貝里琉島西側壁面延伸至貝里琉角的潛點，頂部礁盤在紀念石前方僅9米深，一路下降至30米與貝里琉快車道匯流形成貝里琉角，強勁洋流帶來大量魚類，需使用安全浮標。',{depth:'10-30m',current:'極強',source:'Diversion Dive Travel、oceanhunter.com 2026-07-21'}),
+    S('Orange Beach 登陸潛點',7.005,134.24,'中級','','low','1944年美軍登陸貝里琉島的登陸點之一，現已成為輕鬆的淺水潛點，沙地中仍可見小型遺物，適合與歷史之旅合併安排，珊瑚覆蓋逐漸恢復，適合新手與潛水攝影。',{depth:'5-18m',current:'弱',source:'divessi.com 2026-07-21'})
+  ],
+  nhatrang:[
+    S('聖母島 Madonna Rock',12.175,109.265,'中級','','medium','位於朋島東北側的潛點，是芽莊最著名的潛點之一。地形由巨石形成，包含隧道、洞穴與拱形地貌。深度從5至25米，適合各級潛水員，能見度常超過20米，常見海鱔、螺貝類與大型魚類。',{depth:'5-25m',current:'弱',source:'divessi.com、zentacle.com、scubago.com 2026-07-21'}),
+    S('Moray Beach 海鱔潛點',12.165,109.235,'初級','','low','寬廣的珊瑚花園斜坡潛點，擁有數百種硬珊瑚與軟珊瑚，也適合浮潛與開放水域課程入門，常見海鱔、小型魚類、獅子魚、小型毒魚。',{depth:'5-15m',current:'弱',source:'vietnamdivecenter.com、divessi.com 2026-07-21'}),
+    S('電鬼尖峰 Electric Nose',12.15,109.28,'高級','','low','地形以深50米處一路直達水面的巨大尖峰，覆蓋大量軟珊瑚，提供豐富微距生態。可搭配彩色礁區與洞穴一起探索，需花上幾天才能看完整地形，建議進階潛水員前往。',{depth:'10-50m',current:'強',source:'adventureinyou.com 2026-07-21'}),
+    S('北島 Hon Bac',12.19,109.27,'初級','','low','島周水域安定且水深不深，珊瑚礁保存良好，適合初學者與進階潛水員。深度僅5-18米，適合課程與輕鬆潛水。',{depth:'5-18m',current:'弱',source:'divessi.com 2026-07-21'})
+  ],
+  condao:[
+    S('Shark Fin (Hon Cau)',8.62,106.52,'初級','','low','位於Hon Cau島的主要潛點，需搭速艇前往，淺水珊瑚區介於2-8米之間，能見度常為崑島最佳，可見大型魚類、竹鯊與海龜。',{depth:'2-8m',current:'弱',source:'divecondao.com 2026-07-21'}),
+    S('馬蹄礁 Horseshoe',8.69,106.65,'初級','海龜','medium','位於Hon Bay Canh島北側的潛點，是崑島最重要的海龜產卵地。淺水區適合浮潛，深水區可潛至18-25米，兩側並存枝狀珊瑚與桌狀珊瑚，支持多樣的礁魚生態。',{depth:'5-25m',current:'弱',source:'divecondao.com 2026-07-21'}),
+    S('Hon Tai 潛點',8.665,106.62,'初級','','low','崑島最適合新手的潛點之一，水深不超過15米，珊瑚、熱帶魚與珊瑚花園生態健康，適合初學者與開放水域課程。',{depth:'5-15m',current:'弱',source:'vietnam.travel、travelfish.org 2026-07-21'}),
+    S('Hon Trac 潛點',8.65,106.6,'初級','','low','崑島一座相對人潮較少的潛點，水域平緩且水深不深，適合新手及想避開人潮的潛水員。珊瑚花園生態健康，可見魚類、蟹類與大型魚類。',{depth:'5-15m',current:'弱',source:'vietnam.travel 2026-07-21'})
+  ],
+  unawatuna:[
+    S('Rangoon 沉船',5.95,80.22,'高級','','low','百年英國蒸汽船殘骸，沉入深度30米，船體相對破碎。大型魚群常見，需 AOW 以上認證。',{depth:'30m',current:'中等',source:'divessi.com、divinguru.com 2026-07-21'}),
+    S('SS Orestes 沉船',5.94,80.22,'中級','','low','保存相對完整的沉船，深度約22米，船體覆蓋珊瑚與海綿，魚類豐富，適合進階潛水員。',{depth:'22m',current:'弱',source:'unawatunadiving.com、divinguru.com 2026-07-21'}),
+    S('加勒港沉船 Galle Harbour Wreck',6.03,80.21,'初級','','low','位於加勒港附近的沉船，深度約18米，適合新手及進階潛水員，魚類與珊瑚生態豐富。',{depth:'18m',current:'弱',source:'divinguru.com 2026-07-21'}),
+    S('烏納瓦圖納灣礁 Unawatuna Bay Reef',6.0183,80.2525,'初級','','medium','烏納瓦圖納海岸內的淺水珊瑚礁，深度僅6米，可從岸邊直接入水，適合新手與開放水域課程入門。',{depth:'6m',current:'弱',source:'unawatunadiving.com 2026-07-21'})
+  ],
+  trincomalee:[
+    S('斯瓦米岩 Swami Rock',8.5825,81.2456,'中級','海龜','high','位於古堡下方的岸潛點，深度從10至30米。古老寺廟的雕像散落於附近海底。適合各級潛水員，可見珊瑚、海龜與多種熱帶魚。',{depth:'10-30m',current:'弱',source:'Wikipedia、diveplanit.com 2026-07-21'}),
+    S('鴿子島 Pigeon Island',8.717,81.2,'初級','海龜、鯊魚','high','斯里蘭卡三座海洋國家公園之一，位於尼拉維利海岸外約1公里。擁有斯里蘭卡保存最完整的硬珊瑚之一，可見小型鯊魚、海龜與豐富珊瑚魚。適合初學者及浮潛。',{depth:'3-15m',current:'弱',source:'Wikipedia、divevolkdiving.com 2026-07-21'}),
+    S('赫爾墨斯號沉船 HMS Hermes',7.71,81.73,'高級','','medium','1942年4月9日被日本飛機擊沉的英國航空母艦，是世界上規模最大的可潛沉船之一。沉入深度27至52米，需技術潛水訓練及專門設備，只適合經驗豐富的深潛/沉船潛水員。',{depth:'27-52m',current:'強',source:'Wikipedia、xray-mag.com、divingclub.lk 2026-07-21'}),
+    S('海軍島 Navy Island',8.58,81.21,'初級','','low','靠近斯里蘭卡海軍區域的夜潛熱門地點，可見發光浮游生物，也適合白天浮潛。',{current:'弱',source:'beyondwildplaces.com 2026-07-21'})
+  ],
+  mergui:[
+    S('Black Rock 黑岩',11.4,97.1,'高級','鯊魚、蝠鲼','low','孤立於安達曼海中，離緬甸泰邊境城市Kawthaung約160公里。一座80公尺寬的島礁，西側與西南側有垂直壁面。丹老群島最受歡迎的潛點，常見白尖鯊、銀尖鯊、黑尖鯊群，也是觀賞蝠鲼群的名地。',{current:'強',source:'Wikipedia、seacrush.com、mergui.org 2026-07-23'}),
+    S('Western Rocky',9.8,98.3,'高級','鯊魚','low','丹老群島最南端的潛點之一，島心有一條深度20公尺的天然隧道貫穿整座島嶼。可見大型魚類、護士鯊、小型鯊魚與各種小型生物，地形變化豐富。',{current:'中等',source:'seacrush.com、mergui.org 2026-07-23'}),
+    S('Shark Cave 鯊魚洞',10.65,98.6,'中級','鯊魚','low','位於Great Swinton島北方2公里，離Kawthaung約75公里，由三座小島組成。洞穴入口深度5-16公尺，內部有難得一見的護士鯊棲息地，附近常見大型魚群。',{depth:'5-16m',source:'dive-the-world.com、andamanscuba.com 2026-07-23'}),
+    S('High Rock 高岩',10.2,98.4,'初級','','low','位Quion島南方約500公尺，離Kawthaung約25公里。一座只有單棵樹的小島礁，北側與東側有壁面，南側與西側為岩礁。魚群數量驚人，小型熱帶魚大量集結遮蔽壁面，通常是丹老群島行程的第一個潛點。',{source:'dive-the-world.com 2026-07-23'}),
+    S('Seafan Forest 海扇森林',9.9,98.35,'中級-高級','豹紋鯊、鯨鯊','low','一座尖峰從深度50公尺一直上升至8公尺，覆蓋大量巨大海扇，因此得名。可見豹紋鯊，幸運時甚至可能遇到鯨鯊。',{depth:'8-50m',current:'中等',source:'seacrush.com 2026-07-23'})
+  ],
+  havelock:[
+    S('Barren Island 巴倫島',12.28,93.86,'高級','','high','印度唯一活火山所在的無人島，離布萊爾約135公里。火山石沙地形成特殊生態環境，可見安達曼其他地方罕見的物種，需搭乘包船前往，僅限經驗豐富的潛水員。',{current:'中等',source:'Wikipedia、PADI、go2andaman.com 2026-07-23'}),
+    S("Dixon's Pinnacle",11.9,92.95,'高級','','low','哈維洛克島高能量潛點之一，地形從淺水尖峰一路延伸至深水，強勁洋流帶來大型魚群。需進階潛水認證。',{current:'強',source:'scubalov.in 2026-07-23'}),
+    S("Johnny's Gorge",11.92,92.97,'中級','海龜','low','哈維洛克島知名壁面潛點，壁面上覆蓋彩色軟珊瑚與硬珊瑚，常見魚群、海龜。適合中進階潛水員。',{current:'中等',source:'scubalov.in 2026-07-23'}),
+    S('Elephant Beach',12,92.96,'初級','','medium','哈維洛克島最受歡迎的淺水珊瑚礁，也是這裡唯一的岸潛點。適合新手及首次體驗潛水者，附近有垂直壁面適合進階潛水員。',{current:'弱',source:'eternalandamans.com、scubalov.in 2026-07-23'})
+  ],
+  neil:[
+    S('The Lighthouse 燈塔',11.83,93.05,'初級','','medium','尼爾島最受新手歡迎的珊瑚礁，地點在主碼頭附近一座小燈塔周圍的圓形礁區，雖然面積不大，但可見到多樣熱帶魚、大型魚群、螺貝類與小型頭足類。',{current:'弱',source:'scubalov.in 2026-07-23'}),
+    S("Margherita's Mischief",11.89,93.02,'中級','','low','位於哈維洛克島與尼爾島之間的最受歡迎潛點之一，一連串地形向南延伸，底部有特殊海草區，吸引稀有的海中哺乳類動物前來進食，幸運時有機會遇見。',{current:'中等',source:'scubalov.in 2026-07-23'}),
+    S('Junction',11.88,93.03,'中級','','low','位於哈維洛克島與尼爾島之間水道中的潛點，地形以起伏不平的岩石為主，藏有不少有趣的小發現，適合嗜好探索的潛水員。',{current:'中等',source:'scubalov.in 2026-07-23'}),
+    S('Bharatpur 潛點',11.84,93.04,'初級','','medium','尼爾島主要發船點附近的潛點，水域平緩，適合課程與新手，可見到多種熱帶魚、珊瑚。是尼爾島比較輕鬆的潛點之一。',{current:'弱',source:'scubalov.in、seahawksscuba.in 2026-07-23'})
+  ]
+};
+var CITY_COORDS={'新加坡':{lng:103.8198,lat:1.3521},'台北':{lng:121.5654,lat:25.033},'吉隆坡':{lng:101.6869,lat:3.139},'其他城市':{lng:103.8198,lat:1.3521}};
+var HERO_C=['#0f4a3a','#0b3a5a','#0e4a5a','#0a2a4a','#0d3555','#083048','#0a3050','#0f4a2a','#0a3555'];
+function heroColor(name){var h=0;for(var i=0;i<name.length;i++)h=(h+name.charCodeAt(i))%HERO_C.length;return HERO_C[h];}
+var CONF_LABEL={'high':'座標信心：高','medium':'座標信心：中','low':'座標信心：低'};
+var DIFF_BADGE={'初級':'background:rgba(16,185,129,.12);color:#34d399;border-color:rgba(16,185,129,.25)','中級':'background:rgba(245,158,11,.12);color:#fbbf24;border-color:rgba(245,158,11,.25)','高級':'background:rgba(239,68,68,.12);color:#f87171;border-color:rgba(239,68,68,.25)'};
+var level='world',selCountry=null,selIsland=null,selSite=null;
+var mode='explore', itinerary=null, chatState={}, activeRoute=null;
+var transportMarkers=[];
+var expanded=false;
+var currentMarkers=[];
+var camScale=3; /* 現在代表 Leaflet 的實際 zoom 等級，非倍率 */
+var map=L.map('leaflet-map',{zoomControl:false,attributionControl:true,worldCopyJump:true,minZoom:2,maxZoom:17}).setView([8,105],3);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,attribution:'Tiles &copy; Esri'}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,opacity:0.9}).addTo(map);
+map.on('zoomend',function(){camScale=map.getZoom();});
+map.on('click',function(){
+  if(mode!=='explore')return;
+  if(level==='island'){showIslandOverview();}else{closePanel();}
+});
+var routeLine=null;
+function drawRoute(){
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  var latlngs=null;
+  if(mode==='itinerary'&&itinerary){
+    latlngs=itinerary.days.filter(function(d){return d.site||d.island;}).map(function(d){return [d.site?d.site.lat:d.islandLat, d.site?d.site.lng:d.islandLng];});
+    if(itinerary.departureCityLng!==undefined&&latlngs.length>=1){
+      latlngs.unshift([itinerary.departureCityLat,itinerary.departureCityLng]);
+    }
+  } else if(mode==='route'&&activeRoute){
+    latlngs=activeRoute.stops.map(function(s){var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===s.islandId;});return [isl.lat,isl.lng];});
+  }
+  if(!latlngs||latlngs.length<2)return;
+  routeLine=L.polyline(latlngs,{color:'#10b981',weight:1.5,dashArray:'5,4',opacity:0.65,interactive:false}).addTo(map);
+}
+function flyTo(lng,lat,scale){camScale=scale;map.flyTo([lat,lng],scale,{animate:true,duration:0.7});}
+function fitViewAroundCenter(items,centerLng,centerLat,fbZoom,pad,maxZoom,minZoom){
+  minZoom=minZoom||3;
+  if(!items||!items.length)return{lng:centerLng,lat:centerLat,scale:fbZoom};
+  var bounds=L.latLngBounds(items.map(function(it){return [it.lat,it.lng];}));
+  bounds=bounds.pad(0.25);
+  var z=map.getBoundsZoom(bounds);
+  z=Math.max(minZoom,Math.min(z,maxZoom));
+  return{lng:centerLng,lat:centerLat,scale:z};
+}
+window.zoomBy=function(f){map.setZoom(map.getZoom()+(f>1?1:-1));};
+function clearMk(){currentMarkers.forEach(function(m){map.removeLayer(m.marker);});currentMarkers=[];}
+function updateSelectedMarker(){currentMarkers.forEach(function(m,i){if(m.el)m.el.classList.toggle('sel',i===selSite);});}
+function addMk(lng,lat,html,onclick,cls){
+  var icon=L.divIcon({html:'<div class="dive-mk'+(cls?' '+cls:'')+'">'+html+'</div>',className:'',iconSize:[0,0],iconAnchor:[0,0]});
+  var marker=L.marker([lat,lng],{icon:icon}).addTo(map);
+  marker.on('click',function(e){L.DomEvent.stopPropagation(e);onclick();});
+  var wrapEl=marker.getElement();
+  var el=wrapEl?wrapEl.querySelector('.dive-mk'):null;
+  currentMarkers.push({lng:lng,lat:lat,marker:marker,el:el});
+}
+function clearTransportPoints(){transportMarkers.forEach(function(m){map.removeLayer(m.marker);});transportMarkers=[];}
+function showTransportPoints(fromPt,toPt){
+  clearTransportPoints();
+  [{pt:fromPt,cls:'transport-from'},{pt:toPt,cls:'transport-to'}].forEach(function(o){
+    var icon=L.divIcon({html:'<div class="transport-pt '+o.cls+'"><div class="transport-pt-dot"></div><div class="transport-pt-lbl">'+o.pt.label+'</div></div>',className:'',iconSize:[0,0],iconAnchor:[0,0]});
+    var marker=L.marker([o.pt.lat,o.pt.lng],{icon:icon,interactive:false}).addTo(map);
+    transportMarkers.push({lng:o.pt.lng,lat:o.pt.lat,marker:marker});
+  });
+}
+var weatherCache={};
+async function fetchRealWeather(isl){
+  if(weatherCache[isl.id])return weatherCache[isl.id];
+  try{
+    var url='https://api.open-meteo.com/v1/forecast?latitude='+isl.lat+'&longitude='+isl.lng+'&current=temperature_2m,precipitation&timezone=auto';
+    var res=await fetch(url);
+    var data=await res.json();
+    var result={temp:Math.round(data.current.temperature_2m*10)/10,rain:data.current.precipitation>0?Math.min(100,Math.round(data.current.precipitation*20)):0,live:true};
+    weatherCache[isl.id]=result;
+    return result;
+  }catch(err){
+    console.error('weather fetch failed',err);
+    return {temp:isl.wxT,rain:isl.wxR,live:false};
+  }
+}
+function updateWxCard(){
+  var card=document.getElementById('wx-card');
+  if(level!=='island'){card.classList.remove('show');return;}
+  var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});
+  if(!isl){card.classList.remove('show');return;}
+  card.innerHTML='☁️ <div><div class="wx-t">···</div><div class="wx-sub">查詢中</div></div>';
+  card.classList.add('show');
+  fetchRealWeather(isl).then(function(w){
+    if(level!=='island'||selIsland!==isl.id)return;
+    card.innerHTML='☁️ <div><div class="wx-t">'+w.temp+'°C</div><div class="wx-sub">'+(w.live?'即時降雨 '+w.rain+'%':'降雨 '+w.rain+'%（離線估計）')+'</div></div>';
+  });
+}
+window.render=function(){
+  clearMk();renderBc();renderSb();renderStats();updateWxCard();
+  if(level==='world'){
+    COUNTRIES.forEach(function(c){
+      addMk(c.lng,c.lat,'<div class="ring mu" style="border-color:'+c.color+';background:'+c.color+'40"></div><div class="lbl">'+c.name+'</div>',(function(id){return function(){drillCountry(id);};})(c.id));
+    });
+    flyTo(105,8,3);
+  }
+  else if(level==='country'){
+    var islands=ISLANDS[selCountry]||[];
+    islands.forEach(function(isl){addMk(isl.lng,isl.lat,'<div class="ring mu"></div><div class="lbl">'+isl.name+'</div>',(function(id){return function(){drillIsland(id);};})(isl.id));});
+    var c=COUNTRIES.find(function(x){return x.id===selCountry;});
+    var v=fitViewAroundCenter(islands,c.lng,c.lat,6,1.8,9,islands.length?4:6);flyTo(v.lng,v.lat,v.scale);
+  } else if(level==='island'){
+    var sites=SITES[selIsland]||[];
+    sites.forEach(function(s,i){addMk(s.lng,s.lat,'<div class="ring '+(s.visited?'mv':'mu')+'">'+(s.visited?'✓':'')+'</div><div class="lbl">'+s.name+'</div>',(function(idx){return function(){openSite(idx);};})(i),(i===selSite?'sel':''));});
+    var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});
+    var v2=fitViewAroundCenter(sites,isl.lng,isl.lat,13,0.02,15,11);flyTo(v2.lng,v2.lat,v2.scale);
+  }
+  drawRoute();
+};
+window.drillCountry=function(id){if(mode!=='explore')return;level='country';selCountry=id;selIsland=null;closePanel();render();};
+function drillIsland(id){if(mode!=='explore')return;level='island';selIsland=id;render();showIslandOverview();}
+window.drillRouteExt=function(id){
+  if(mode!=='explore')return;
+  var routes=ROUTES[selCountry]||[];
+  activeRoute=routes.find(function(r){return r.id===id;});
+  if(!activeRoute)return;
+  mode='route';
+  document.getElementById('mode-pill').style.display='flex';
+  document.querySelector('.mode-pill').innerHTML='<i class="ti ti-anchor" style="font-size:9px" aria-hidden="true"></i>船宿路線<i class="ti ti-x" style="font-size:10px;cursor:pointer;margin-left:2px" onclick="exitRoute()" aria-hidden="true"></i>';
+  clearMk();
+  activeRoute.stops.forEach(function(s,i){
+    var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===s.islandId;});
+    addMk(isl.lng,isl.lat,'<div class="route-mk-num">'+(i+1)+'</div><div class="route-mk-lbl">'+isl.name+(s.label?'·'+s.label:'')+'</div>',(function(idx){return function(){selectRouteStop(idx);};})(i),'route-mk-wrap');
+  });
+  var allIslands=activeRoute.stops.map(function(s){return (ISLANDS[selCountry]||[]).find(function(x){return x.id===s.islandId;});});
+  prepareRouteView();
+  selectRouteStop(0);
+  document.getElementById('panel').classList.remove('open','itin-open');
+  document.getElementById('panel-peek').classList.remove('hidden');
+  var minLng=Math.min.apply(null,allIslands.map(function(i){return i.lng;})),maxLng=Math.max.apply(null,allIslands.map(function(i){return i.lng;}));
+  var minLat=Math.min.apply(null,allIslands.map(function(i){return i.lat;})),maxLat=Math.max.apply(null,allIslands.map(function(i){return i.lat;}));
+  var cLng=(minLng+maxLng)/2,cLat=(minLat+maxLat)/2;
+  var v=fitViewAroundCenter(allIslands,cLng,cLat,6,0.05,9,4);flyTo(v.lng,v.lat,v.scale);
+};
+function prepareRouteView(){
+  var p=document.getElementById('panel');
+  var html='<div class="route-hdr" style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="route-ttl">'+activeRoute.name+'</div><div class="route-sub">'+activeRoute.operator+' · '+activeRoute.days+' 天</div></div><span style="cursor:pointer;color:var(--tm);font-size:14px" onclick="togglePanel(false)">›</span></div>';
+  html+='<div class="route-days">';
+  activeRoute.stops.forEach(function(s,i){
+    var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===s.islandId;});
+    html+='<div class="route-day" onclick="selectRouteStop('+i+')"><div class="route-day-dot" id="rdot-'+i+'"></div><div class="route-day-lbl">Day '+(i+1)+'</div><div class="route-day-sub">'+isl.name+(s.label?' · '+s.label:'')+'</div></div>';
+  });
+  html+='</div>';
+  p.innerHTML=html;
+}
+window.selectRouteStop=function(i){
+  var s=activeRoute.stops[i];
+  var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===s.islandId;});
+  document.querySelectorAll('.route-day-dot').forEach(function(el,idx){el.style.background=idx===i?'#38bdf8':'var(--green)';});
+  currentMarkers.forEach(function(m,idx){m.el.classList.toggle('sel',idx===i);});
+  flyTo(isl.lng,isl.lat,Math.max(camScale,8));
+};
+window.exitRoute=function(){
+  mode='explore';activeRoute=null;
+  document.getElementById('mode-pill').style.display='none';
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  document.getElementById('panel-peek').classList.add('hidden');
+  render();
+  closePanel();
+  toggleSb(true);
+};
+window.showIslandOverview=function showIslandOverview(){
+  selSite=null;
+  updateSelectedMarker();
+  var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});
+  if(!isl)return;
+  var sites=SITES[selIsland]||[];
+  var p=document.getElementById('panel');
+  p.classList.add('open');p.classList.remove('expanded','itin-open');
+  var MN=['','1','2','3','4','5','6','7','8','9','10','11','12'];
+  var html='<div class="isl-hdr"><div class="isl-name">'+isl.name+'</div><div class="isl-count">'+sites.length+' 個潛點</div></div>';
+  html+='<div class="isl-body">';
+  if(isl.rainy||isl.dry){
+    html+='<div class="isl-legend"><div class="isl-legend-item"><span class="isl-dot rain"></span>雨季</div><div class="isl-legend-item"><span class="isl-dot dry"></span>乾季</div></div>';
+    html+='<div class="month-row">';
+    for(var m=1;m<=12;m++){
+      var cls=(isl.rainy&&isl.rainy.indexOf(m)>-1)?'rain':((isl.dry&&isl.dry.indexOf(m)>-1)?'dry':'');
+      html+='<div class="month-pill '+cls+'">'+MN[m]+'</div>';
+    }
+    html+='</div>';
+    html+='<div class="isl-sec-lbl"><span class="isl-dot close"></span>關閉季節</div>';
+    html+='<div class="month-row">';
+    for(var m2=1;m2<=12;m2++){
+      var cls2=(isl.closure&&isl.closure.indexOf(m2)>-1)?'close':'';
+      html+='<div class="month-pill '+cls2+'">'+MN[m2]+'</div>';
+    }
+    html+='</div>';
+    html+='<div class="isl-sec-lbl">特定生物出現季節</div>';
+    html+='<div class="wild-list"><div class="wild-item">'+(isl.wildlife||'尚無資料')+'</div></div>';
+  } else {
+    html+='<div class="isl-empty-note">此島嶼的季節資訊尚未建立，敬請期待。</div>';
+  }
+  html+='</div><div class="isl-hint">點選地圖上的潛點查看詳情</div>';
+  p.innerHTML=html;
+}
+window.goLevel=function(lv){
+  if(lv==='world'){
+    if(mode==='route'){activeRoute=null;if(routeLine){map.removeLayer(routeLine);routeLine=null;}}
+    if(mode==='itinerary'){itinerary=null;if(routeLine){map.removeLayer(routeLine);routeLine=null;}}
+    if(mode==='chat'){chatState={};}
+    mode='explore';
+    document.getElementById('mode-pill').style.display='none';
+    if(searchbox){searchbox.classList.remove('ai-mode');searchbox.style.opacity='1';}
+    if(searchIcon){searchIcon.className='ti ti-search';searchIcon.style.color='';}
+    if(searchInput){searchInput.disabled=false;searchInput.value='';}
+    level='world';selCountry=null;selIsland=null;
+    document.getElementById('panel-peek').classList.add('hidden');
+    toggleSb(true);
+  } else if(mode!=='explore'){ return; }
+  closePanel();render();
+};
+function openSite(idx){
+  if(mode!=='explore')return;
+  expanded=false;
+  selSite=idx;
+  updateSelectedMarker();
+  var s=(SITES[selIsland]||[])[idx];if(!s)return;
+  flyTo(s.lng,s.lat,Math.max(camScale,14));
+  var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});
+  var p=document.getElementById('panel');
+  p.classList.add('open');p.classList.remove('expanded');
+  var html='<div class="back-to-isl" onclick="showIslandOverview()">‹ 返回'+isl.name+'總覽</div>';
+  html+='<div class="hero" style="background:'+heroColor(s.name)+'">'+(s.visited?'<div class="visit-badge">✓ 已造訪</div>':'')+'</div>';
+  html+='<div class="pbody"><div class="pname">'+s.name+'</div><div class="pnameen">'+isl.name+'</div>';
+  html+='<div class="status-card"><div class="status-row"><div class="status-wx">☁️<div><div class="status-temp" id="site-wx-temp">···</div><div class="status-sub" id="site-wx-sub">查詢中</div></div></div>'+(s.current?'<div style="font-size:11px;color:var(--amber);font-weight:500">洋流：'+s.current+'</div>':'<div style="font-size:9px;color:var(--tm)">洋流待補</div>')+'</div></div>';
+  html+='<div class="ptags"><span class="ptag tb">'+s.diff+'</span>'+(s.wild?'<span class="ptag tg">'+s.wild+'</span>':'')+'</div>';
+  if(s.depth)html+='<div class="mg"><div class="mc"><div class="mc-l">深度</div><div class="mc-v">'+s.depth+'</div></div><div class="mc"><div class="mc-l">難度</div><div class="mc-v">'+s.diff+'</div></div></div>';
+  html+='<div class="pdesc">'+s.desc+'</div>';
+  html+='<div class="expand-section"><div class="exp-divider"></div>';
+  html+='<div class="exp-block"><div class="exp-label">造訪紀錄</div><div class="visit-history">';
+  if(s.visited&&s.visitDates){
+    html+='<div class="visit-row"><span>造訪次數</span><span style="color:var(--t)">'+s.visitDates.length+' 次</span></div>';
+    s.visitDates.forEach(function(d,k){html+='<div class="visit-row"><span>'+(k===0?'最近一次':'再之前')+'</span><span style="color:var(--t)">'+d+'</span></div>';});
+  } else { html+='<div class="visit-row"><span>尚未造訪</span><span>—</span></div>'; }
+  html+='</div></div>';
+  html+='<div class="exp-block"><div class="exp-label">我的筆記</div>'+((s.visited&&s.note)?'<div class="note-box">「'+s.note+'」</div>':'<div style="font-size:10px;color:var(--tm);font-style:italic">造訪後可以在這裡寫下心得</div>')+'</div>';
+  html+='<div class="exp-block"><div class="exp-label">座標與來源</div><div class="source-row">📍 '+CONF_LABEL[s.conf]+'</div><div class="source-row" style="margin-top:3px">📄 來源：'+(s.source||'—')+'</div></div>';
+  html+='</div>';
+  html+='<div class="expand-btn" onclick="toggleExpand()"><span id="expand-text">查看完整資訊</span><span style="font-size:10px">▾</span></div>';
+  html+='</div>';
+  p.innerHTML=html;
+  fetchRealWeather(isl).then(function(w){
+    if(selSite!==idx)return;
+    var tEl=document.getElementById('site-wx-temp'),sEl=document.getElementById('site-wx-sub');
+    if(tEl){tEl.textContent=w.temp+'°C';sEl.textContent=w.live?'即時降雨 '+w.rain+'%':'降雨 '+w.rain+'%（離線估計）';}
+  });
+}
+window.toggleExpand=function(){expanded=!expanded;var p=document.getElementById('panel');p.classList.toggle('expanded',expanded);document.getElementById('expand-text').textContent=expanded?'收合':'查看完整資訊';};
+function closePanel(){selSite=null;document.getElementById('panel').classList.remove('open','expanded','itin-open');document.getElementById('panel').innerHTML='<div class="panel-empty">點選潛點看詳情，或在上方打字試試 AI 規劃</div>';}
+function renderBc(){
+  var h='<span class="bci'+(level==='world'?' act':'')+'" onclick="goLevel(\'world\')">🌐 全部</span>';
+  if(selCountry){var c=COUNTRIES.find(function(x){return x.id===selCountry;});h+=' › <span class="bci'+(!selIsland?' act':'')+'" onclick="drillCountry(\''+selCountry+'\')">'+c.name+'</span>';
+    if(selIsland){var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});h+=' › <span class="bci act">'+isl.name+'</span>';}
+  }
+  document.getElementById('bc').innerHTML=h;
+}
+function renderSb(){
+  var ttl=document.getElementById('sb-ttl'),list=document.getElementById('sb-list');
+  if(level==='world'){ttl.textContent='國家';list.innerHTML=COUNTRIES.map(function(c){return '<div class="si" onclick="drillCountry(\''+c.id+'\')"><div class="si-swatch" style="background:'+c.color+'"></div><div class="si-name">'+c.name+'</div><div class="si-sub">'+(c.sites||'—')+'</div></div>';}).join('');}
+  else if(level==='country'){ttl.textContent='島嶼';var islands=ISLANDS[selCountry]||[];
+    var html='';
+    if(!islands.length){html='<div style="padding:10px;font-size:10px;color:var(--tm)">尚未收錄此國家的潛點資料</div>';}
+    else{html=islands.map(function(isl){return '<div class="si'+(selIsland===isl.id?' act':'')+'" onclick="drillIslExt(\''+isl.id+'\')"><div class="si-name">'+isl.name+'</div><span class="si-sub">'+(SITES[isl.id]||[]).length+'</span></div>';}).join('');}
+    var routes=ROUTES[selCountry]||[];
+    if(routes.length){
+      html+='<div class="sb-ttl" style="margin-top:12px;padding:0 8px 4px">船宿路線</div>';
+      html+=routes.map(function(r){return '<div class="si route" onclick="drillRouteExt(\''+r.id+'\')"><i class="ti ti-anchor" style="font-size:11px" aria-hidden="true"></i><div class="si-name">'+r.name.split(' ')[0]+'</div><span class="si-sub">'+r.days+'天</span></div>';}).join('');
+    }
+    list.innerHTML=html;
+  }
+  else if(level==='island'){ttl.textContent='潛點';var sites=SITES[selIsland]||[];list.innerHTML=sites.map(function(s,i){return '<div class="si" onclick="openSiteExt('+i+')"><div class="si-swatch" style="background:'+(s.visited?'#ef4444':'#0ea5e9')+'"></div><div class="si-name">'+s.name+'</div><div class="si-badge" style="'+(DIFF_BADGE[s.diff]||'')+'">'+s.diff+'</div></div>';}).join('');}
+}
+window.drillIslExt=function(id){drillIsland(id);};
+window.openSiteExt=function(i){openSite(i);};
+function renderStats(){
+  var t='世界地圖 · 154 個已驗證潛點';
+  if(level==='country'){var c=COUNTRIES.find(function(x){return x.id===selCountry;});t=c.name+' · '+(c.sites||0)+' 個潛點';}
+  if(level==='island'){var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});t=isl.name+' · '+(SITES[selIsland]||[]).length+' 個潛點';}
+  document.querySelector('.stats .st-v').textContent=t;
+}
+window.toggleSb=function(open){var sb=document.getElementById('sb'),peek=document.getElementById('sb-peek');var o=(typeof open==='boolean')?open:!sb.classList.contains('open');sb.classList.toggle('open',o);peek.classList.toggle('hidden',o);};
+window.togglePanel=function(open){
+  var p=document.getElementById('panel'),peek=document.getElementById('panel-peek');
+  var isOpen=p.classList.contains('open')||p.classList.contains('itin-open');
+  var o=(typeof open==='boolean')?open:!isOpen;
+  if(o){
+    if(mode==='route'){p.classList.add('open');}
+    peek.classList.add('hidden');
+  } else {
+    p.classList.remove('open','itin-open','expanded');
+    peek.classList.remove('hidden');
+  }
+};
+if(typeof ResizeObserver!=='undefined'){
+  new ResizeObserver(function(){map.invalidateSize();}).observe(document.getElementById('map-wrap'));
+}
+document.getElementById('sq').addEventListener('input',function(e){var q=e.target.value.trim();if(!q)return;var c=COUNTRIES.find(function(x){return x.name.indexOf(q)>-1;});if(c)drillCountry(c.id);});
+function loadWorld(){ render(); }
+/* ===== AI 對話規劃層（疊加，不影響探索模式與既有 154 個潛點資料）===== */
+var searchbox=document.getElementById('searchbox');
+var searchInput=document.getElementById('sq');
+var searchIcon=document.getElementById('search-icon');
+searchInput.addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  var v=searchInput.value.trim();if(!v)return;
+  var isNatural=v.length>=5 && /[想要幫我推薦？?]/.test(v);
+  if(isNatural){ startAiChat(v); }
+  else{
+    var c=COUNTRIES.find(function(x){return x.name.indexOf(v)>-1;});
+    var isl=null;Object.keys(ISLANDS).forEach(function(k){ISLANDS[k].forEach(function(i){if(i.name.indexOf(v)>-1)isl={country:k,id:i.id};});});
+    if(isl){drillCountry(isl.country);drillIsland(isl.id);}else if(c){drillCountry(c.id);}
+  }
+});
+function startAiChat(query){
+  mode='chat';
+  toggleSb(false);
+  searchbox.classList.add('ai-mode');
+  searchIcon.textContent='✨';searchIcon.style.color='var(--green)';
+  searchInput.value=query;searchInput.disabled=true;
+  var panel=document.getElementById('panel');
+  panel.classList.add('open');panel.classList.remove('itin-open');
+  panel.innerHTML='<div class="chat-hdr">AI 規劃助手 ✨</div><div class="chat-body" id="chat-body"></div>';
+  var body=document.getElementById('chat-body');
+  addBubble(body,query,'user');
+  addThinking(body,function(){
+    addBubble(body,'好的，先確認幾個必要條件。你大概有幾天假期？','ai');
+    addChips(body,['5 天','7 天','10 天以上'],function(v){
+      chatState.days=v;
+      addThinking(body,function(){
+        addBubble(body,'你會從哪裡出發？','ai');
+        addChips(body,['新加坡','台北','吉隆坡','其他城市'],function(vCity){
+          chatState.departureCity=vCity;
+          addThinking(body,function(){
+            addBubble(body,'潛水證照大概到哪個等級？','ai');
+            addChips(body,['OW 入門','AOW 30 潛以上','更高階'],function(v2){
+              chatState.cert=v2;
+              addThinking(body,function(){
+                addBubble(body,'最想看到什麼生態？','ai');
+                addChips(body,['海龜、鯊魚','微距、沉船','都好'],function(v3){
+                  chatState.wildlife=v3;
+                  addThinking(body,function(){
+                    addBubble(body,'比較喜歡跳島定點還是船宿巡航？','ai');
+                    addChips(body,['跳島定點','船宿巡航'],function(v4){
+                      chatState.diveStyle=v4;
+                      addThinking(body,function(){ showItineraryResult(body); },1200);
+                    });
+                  });
+                });
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+}
+function addBubble(body,text,who){var d=document.createElement('div');d.className='bubble '+who;d.textContent=text;body.appendChild(d);body.scrollTop=body.scrollHeight;}
+function addChips(body,options,onPick){
+  var wrap=document.createElement('div');wrap.className='chips';
+  options.forEach(function(opt){var c=document.createElement('div');c.className='chip';c.textContent=opt;c.onclick=function(){wrap.remove();addBubble(body,opt,'user');onPick(opt);};wrap.appendChild(c);});
+  body.appendChild(wrap);body.scrollTop=body.scrollHeight;
+}
+function addThinking(body,cb,delay){
+  var t=document.createElement('div');t.className='thinking';t.innerHTML='<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  body.appendChild(t);body.scrollTop=body.scrollHeight;
+  setTimeout(function(){t.remove();cb();},delay||900);
+}
+function showItineraryResult(body){
+  if(chatState.diveStyle==='船宿巡航'){
+    addBubble(body,'幫你排了一份船宿行程：搭乘 Prince Ulua 跑馬爾地夫四方線，5 天走完 Kaafu、Alif、Vaavu 三個環礁區域。','ai');
+  } else {
+    addBubble(body,'幫你排了一份行程：馬布島當基地，跳島西巴丹看海龜鯊魚，穿插馬布島/卡帕來調整潛。','ai');
+  }
+  buildItineraryData();
+  var btn=document.createElement('button');
+  btn.className='chip';btn.style.cssText='align-self:stretch;text-align:center;margin-top:4px;border-color:rgba(16,185,129,.4);color:#34d399';
+  btn.textContent='查看完整行程 →';
+  btn.onclick=function(){enterItinerary();};
+  body.appendChild(btn);body.scrollTop=body.scrollHeight;
+}
+function buildItineraryData(){
+  var city=chatState.departureCity||'新加坡';
+  var cityCoord=CITY_COORDS[city]||CITY_COORDS['新加坡'];
+  if(chatState.diveStyle==='船宿巡航'){
+    var route=ROUTES.mv[0];
+    var days=[];
+    route.stops.forEach(function(s,i){
+      var isl=ISLANDS.mv.find(function(x){return x.id===s.islandId;});
+      if(i===0){
+        days.push({label:'D1 '+isl.name,island:isl.name,islandLng:isl.lng,islandLat:isl.lat,
+          fromPt:{lng:cityCoord.lng,lat:cityCoord.lat,label:city},toPt:{lng:isl.lng,lat:isl.lat,label:isl.name},
+          transport:[
+          {icon:'✈️',text:city+'→男性島（機票，含轉機）',price:'約 NT$16,000'}
+        ],rest:'抵達'+isl.name+'登船，裝備檢查，晚上啟航。'});
+      } else if(i===route.stops.length-1){
+        days.push({label:'D'+(i+1)+' '+isl.name,island:isl.name,islandLng:isl.lng,islandLat:isl.lat,rest:isl.name+'潛水後返航男性島。',
+          fromPt:{lng:isl.lng,lat:isl.lat,label:isl.name},toPt:{lng:cityCoord.lng,lat:cityCoord.lat,label:city},
+          transport:[
+          {icon:'✈️',text:'男性島→'+city+'（機票，含轉機）',price:'約 NT$16,000'}
+        ]});
+      } else {
+        days.push({label:'D'+(i+1)+' '+isl.name,island:isl.name,islandLng:isl.lng,islandLat:isl.lat});
+      }
+    });
+    itinerary={
+      country:'mv',
+      departureCityLng:cityCoord.lng,departureCityLat:cityCoord.lat,
+      title:route.name+' · '+route.operator,
+      days:days,
+      budget:[
+        {label:city+'來回機票',val:'約 NT$32,000'},
+        {label:'船宿套裝（'+route.days+'天，含餐飲）',val:'約 NT$45,000'}
+      ],
+      total:'約 NT$77,000'
+    };
+    return;
+  }
+  var sipadanSites=SITES.sipadan||[],mabulSites=SITES.mabul||[],kapalaiSites=SITES.kapalai||[];
+  function findSite(arr,name){var f=arr.filter(function(s){return s.name===name;});return f[0]||arr[0];}
+  itinerary={
+    country:'my',
+    departureCityLng:cityCoord.lng,departureCityLat:cityCoord.lat,
+    title:'馬布島基地 · 西巴丹跳島 7 天大型生物行程',
+    days:[
+      {label:'D1 抵達',island:'馬布島',islandLng:118.6167,islandLat:4.2333,
+        fromPt:{lng:cityCoord.lng,lat:cityCoord.lat,label:city},toPt:{lng:118.6167,lat:4.2333,label:'馬布島'},
+        transport:[
+        {icon:'✈️',text:city+'→斗湖（機票）',price:'約 NT$4,500'},
+        {icon:'🚗',text:'斗湖→仙本那→快艇上馬布島',price:'約 NT$1,200'}
+      ],rest:'下午抵達度假村，裝備檢查，早點休息準備隔天配額潛水。'},
+      {label:'D2 西巴丹跳島日 1',badge:'配額日',site:findSite(sipadanSites,'Barracuda Point')},
+      {label:'D3 馬布島調整日',site:findSite(mabulSites,'Eel Garden')},
+      {label:'D4 西巴丹跳島日 2',badge:'配額日',site:findSite(sipadanSites,'Whitetip Avenue')},
+      {label:'D5 卡帕來微距日',site:findSite(kapalaiSites,'Mandarin Valley')},
+      {label:'D6 馬布島收尾',site:findSite(mabulSites,'Crocodile Avenue'),rest:'下午自由活動，準備返程（潛水後 18 小時內不建議搭機）。'},
+      {label:'D7 返程',island:'馬布島',islandLng:118.6167,islandLat:4.2333,
+        fromPt:{lng:118.6167,lat:4.2333,label:'馬布島'},toPt:{lng:cityCoord.lng,lat:cityCoord.lat,label:city},
+        transport:[
+        {icon:'🚗',text:'馬布島→仙本那→斗湖',price:'約 NT$1,200'},
+        {icon:'✈️',text:'斗湖→'+city+'（機票）',price:'約 NT$4,500'}
+      ]}
+    ],
+    budget:[
+      {label:'斗湖來回機票+快艇',val:'NT$11,400'},
+      {label:'潛水套裝（含配額費）',val:'約 NT$13,500'},
+      {label:'住宿（6 晚）',val:'約 NT$9,000'}
+    ],
+    total:'約 NT$33,900'
+  };
+}
+function enterItinerary(){
+  mode='itinerary';
+  level='country';selCountry=itinerary.country||'my';selIsland=null;
+  renderBc();renderSb();
+  toggleSb(false);
+  clearTransportPoints();
+  document.getElementById('mode-pill').style.display='flex';
+  searchbox.style.opacity='0.4';
+  clearMk();
+  itinerary.days.forEach(function(d,i){
+    if(d.site){addMk(d.site.lng,d.site.lat,(i+1),function(){selectItinDay(i);},'itin');var m=currentMarkers[currentMarkers.length-1];m.el.innerHTML='<div class="ring itin">'+(i+1)+'</div><div class="lbl">'+d.site.name+'</div>';}
+    else if(d.island){addMk(d.islandLng,d.islandLat,(i+1),function(){selectItinDay(i);},'itin');var m2=currentMarkers[currentMarkers.length-1];m2.el.innerHTML='<div class="ring itin">'+(i+1)+'</div><div class="lbl">'+d.island+'</div>';}
+  });
+  renderFullItinerary();
+  selectItinDay(0);
+  var allPoints=itinerary.days.filter(function(d){return d.site||d.island;}).map(function(d){return d.site?d.site:{lng:d.islandLng,lat:d.islandLat};});
+  var cLng0=selCountry==='mv'?73:114,cLat0=selCountry==='mv'?4:4;
+  var v=fitViewAroundCenter(allPoints,cLng0,cLat0,6,3,9,4);flyTo(v.lng,v.lat,v.scale);
+  document.querySelector('.stats .st-v').textContent=selCountry==='mv'?'行程模式：馬爾地夫四方線':'行程模式：馬布島 · 西巴丹 · 卡帕來';
+}
+function renderFullItinerary(){
+  var p=document.getElementById('panel');
+  p.classList.add('open','itin-open');p.classList.remove('expanded');
+  var isLiveaboard=chatState.diveStyle==='船宿巡航';
+  var html='<div class="itin-scroll"><div class="itin-hdr">';
+  html+='<div class="itin-tag">✨ AI 行程建議</div>';
+  html+='<div class="itin-ttl">'+itinerary.title+'</div>';
+  if(isLiveaboard){
+    html+='<div class="itin-meta"><div class="itin-meta-item">📅 '+(chatState.days||'')+'</div><div class="itin-meta-item">🎯 '+(chatState.cert||'')+'</div></div>';
+    html+='<div class="itin-match"><span class="itin-match-tag">符合：船宿巡航</span><span class="itin-match-tag">出發：'+(chatState.departureCity||'新加坡')+'</span></div>';
+  } else {
+    html+='<div class="itin-meta"><div class="itin-meta-item">📅 8月中，7天</div><div class="itin-meta-item">🎯 AOW/30+潛</div></div>';
+    html+='<div class="itin-match"><span class="itin-match-tag">符合：海龜/鯊魚</span><span class="itin-match-tag">符合：15-30k</span></div>';
+  }
+  html+='</div>';
+  if(isLiveaboard){
+    html+='<div class="itin-note">ℹ️ <strong style="color:var(--amber)">重要限制：</strong>船宿行程需視天氣狀況調整路線，實際航點順序可能因海況變動。</div>';
+  } else {
+    html+='<div class="itin-note">ℹ️ <strong style="color:var(--amber)">重要限制：</strong>西巴丹禁止過夜且每日配額有限，行程用馬布島當基地跳島潛水，這是排列核心邏輯。</div>';
+  }
+  html+='<div class="itin-days" id="itin-days-list">';
+  itinerary.days.forEach(function(d,i){
+    html+='<div class="itin-day" data-idx="'+i+'" onclick="selectItinDay('+i+')">';
+    html+='<div class="itin-day-dot" id="dot-'+i+'"></div>';
+    html+='<div class="itin-day-hdr"><span class="itin-day-num">第'+(i+1)+'天</span><span class="itin-day-date">'+d.label.replace(/^D\d+\s*/,'')+'</span>'+(d.badge?'<span class="itin-day-badge">'+d.badge+'</span>':'')+'</div>';
+    if(d.transport){d.transport.forEach(function(t){html+='<div class="transport-mini"><div class="transport-mini-text">'+t.icon+' '+t.text+'</div><div class="transport-mini-price">'+t.price+'</div></div>';});}
+    if(d.site){html+='<div class="mini-site" id="site-'+i+'"><div class="mini-site-name">'+d.site.name+'</div><div class="mini-site-tags"><span class="mini-tag tb">'+d.site.diff+'</span>'+(d.site.wild?'<span class="mini-tag tg">'+d.site.wild+'</span>':'')+'</div><div class="mini-desc">'+d.site.desc+'</div></div>';}
+    else if(d.island){html+='<div class="mini-site" id="site-'+i+'"><div class="mini-site-name">'+d.island+'</div></div>';}
+    if(d.rest){html+='<div class="rest-mini">'+d.rest+'</div>';}
+    html+='</div>';
+  });
+  html+='</div></div>';
+  html+='<div class="budget-box"><div class="budget-ttl">預算試算（單人）</div>';
+  itinerary.budget.forEach(function(b){html+='<div class="budget-row"><span>'+b.label+'</span><span style="color:var(--t)">'+b.val+'</span></div>';});
+  html+='<div class="budget-total"><span class="budget-total-label">預估總計</span><span class="budget-total-val">'+itinerary.total+'</span></div></div>';
+  html+='<div class="itin-caveat">ℹ️ <span>交通與價格為參考估算，實際生成時會查詢真實選項。</span></div>';
+  p.innerHTML=html;
+}
+window.selectItinDay=function(i){
+  document.querySelectorAll('.itin-day-dot').forEach(function(el,idx){el.classList.toggle('sel',idx===i);});
+  document.querySelectorAll('.mini-site').forEach(function(el){el.classList.remove('sel');});
+  var siteEl=document.getElementById('site-'+i);if(siteEl)siteEl.classList.add('sel');
+  var d=itinerary.days[i];
+  currentMarkers.forEach(function(m){m.el.classList.remove('sel');});
+  if(d.fromPt&&d.toPt){
+    showTransportPoints(d.fromPt,d.toPt);
+    var v=fitViewAroundCenter([{lng:d.fromPt.lng,lat:d.fromPt.lat},{lng:d.toPt.lng,lat:d.toPt.lat}],(d.fromPt.lng+d.toPt.lng)/2,(d.fromPt.lat+d.toPt.lat)/2,6,0.5,10,4);
+    flyTo(v.lng,v.lat,v.scale);
+  } else {
+    clearTransportPoints();
+    if(d.site||d.island){
+      var mkIdx=itinerary.days.slice(0,i+1).filter(function(x){return x.site||x.island;}).length-1;
+      if(currentMarkers[mkIdx]){
+        currentMarkers[mkIdx].el.classList.add('sel');
+        var lng=d.site?d.site.lng:d.islandLng,lat=d.site?d.site.lat:d.islandLat;
+        flyTo(lng,lat,Math.max(camScale,13));
+      }
+    }
+  }
+  drawRoute();
+};
+function exitItinerary(){
+  mode='explore';itinerary=null;chatState={};
+  document.getElementById('mode-pill').style.display='none';
+  searchbox.classList.remove('ai-mode');searchbox.style.opacity='1';
+  searchIcon.textContent='🔍';searchIcon.style.color='';
+  searchInput.disabled=false;searchInput.value='';
+  if(routeLine){map.removeLayer(routeLine);routeLine=null;}
+  clearTransportPoints();
+  level='world';selCountry=null;selIsland=null;selSite=null;
+  document.getElementById('panel-peek').classList.add('hidden');
+  render();
+  closePanel();
+  toggleSb(true);
+}
+document.getElementById('exit-itin').onclick=exitItinerary;
+
+loadWorld();
+</script>
+</body>
+</html>
