@@ -2,7 +2,19 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>DiveMap 基準版本 v68 - 2026-07-24（修正側邊欄不會自動跳出+Leaflet尺寸同步）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>DiveMap 潛水地圖</title>
+<!-- 內部版本紀錄：v69 - 2026-07-27（加入 PWA 支援：manifest/service worker/圖示） -->
+<meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
+<meta name="theme-color" content="#0a1520">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DiveMap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 .leaflet-container{background:#0d1c2e;font-family:'DM Sans',sans-serif}
@@ -1606,6 +1618,11 @@ function exitItinerary(){
 document.getElementById('exit-itin').onclick=exitItinerary;
 
 loadWorld();
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(err){console.warn('Service worker 註冊失敗（不影響網站正常使用）',err);});
+  });
+}
 </script>
 </body>
 </html>
