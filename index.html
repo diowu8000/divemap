@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v69 - 2026-07-27（加入 PWA 支援：manifest/service worker/圖示） -->
+<!-- 內部版本紀錄：v70 - 2026-07-27（修正app容器固定尺寸，改滿版全螢幕） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -24,7 +24,7 @@
 .transport-pt{position:absolute;left:0;top:0}
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a1520;padding:20px}
+body{background:#0a1520;overflow:hidden}
 :root{
   --bg:#0a1520;--surf:#0d1c2e;--card:#102338;--hover:#142c46;
   --b:rgba(26,58,92,.7);
@@ -32,7 +32,7 @@ body{background:#0a1520;padding:20px}
   --blue:#0ea5e9;--red:#ef4444;--amber:#f59e0b;--cyan:#38bdf8;--green:#10b981;
   font-family:'DM Sans',sans-serif;
 }
-.app{background:var(--bg);border-radius:16px;border:1px solid var(--b);overflow:hidden;display:flex;flex-direction:column;height:640px;max-width:900px;margin:0 auto}
+.app{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw;margin:0}
 .topbar{background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:10}
 .logo{font-size:15px;font-weight:600;color:var(--t);flex-shrink:0}
 .logo span{color:var(--blue)}
