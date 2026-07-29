@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v70 - 2026-07-27（修正app容器固定尺寸，改滿版全螢幕） -->
+<!-- 內部版本紀錄：v76 - 2026-07-29（圖磚亮度調整為方案C強力版：brightness1.9 contrast1.15） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -15,9 +15,15 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DiveMap">
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="preconnect" href="https://basemaps.cartocdn.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.open-meteo.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 .leaflet-container{background:#0d1c2e;font-family:'DM Sans',sans-serif}
+.dm-tile{filter:brightness(1.9) contrast(1.15)}
 .leaflet-control-attribution{background:rgba(10,21,32,.7)!important;color:var(--tm)!important;font-size:8px!important}
 .leaflet-control-attribution a{color:var(--ts)!important}
 .dive-mk{position:absolute;left:0;top:0}
@@ -101,6 +107,8 @@ body{background:#0a1520;overflow:hidden}
 .stats{position:absolute;bottom:10px;right:10px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-radius:10px;padding:8px 12px;z-index:6}
 .st-v{font-family:'DM Mono',monospace;font-size:14px;color:var(--t)}
 .dive-mk{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transform:translate(-50%,-50%);pointer-events:auto;transition:left .5s cubic-bezier(0.22,1,0.36,1),top .5s cubic-bezier(0.22,1,0.36,1);z-index:1}
+.dive-mk.country-pin{transform:translate(-50%,-100%);gap:1px}
+.country-pin-svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .dive-mk:hover{z-index:3}
 .dive-mk .ring{width:13px;height:13px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:7px}
 .dive-mk .ring.mu{background:rgba(14,165,233,.25);border-color:var(--blue);color:var(--blue)}
@@ -1078,9 +1086,8 @@ var transportMarkers=[];
 var expanded=false;
 var currentMarkers=[];
 var camScale=3; /* 現在代表 Leaflet 的實際 zoom 等級，非倍率 */
-var map=L.map('leaflet-map',{zoomControl:false,attributionControl:true,worldCopyJump:true,minZoom:2,maxZoom:17}).setView([8,105],3);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,attribution:'Tiles &copy; Esri'}).addTo(map);
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,opacity:0.9}).addTo(map);
+var map=L.map('leaflet-map',{zoomControl:false,attributionControl:true,worldCopyJump:true,minZoom:2,maxZoom:19}).setView([8,105],3);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,detectRetina:true,subdomains:'abcd',className:'dm-tile',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
 map.on('zoomend',function(){camScale=map.getZoom();});
 map.on('click',function(){
   if(mode!=='explore')return;
@@ -1162,7 +1169,10 @@ window.render=function(){
   clearMk();renderBc();renderSb();renderStats();updateWxCard();
   if(level==='world'){
     COUNTRIES.forEach(function(c){
-      addMk(c.lng,c.lat,'<div class="ring mu" style="border-color:'+c.color+';background:'+c.color+'40"></div><div class="lbl">'+c.name+'</div>',(function(id){return function(){drillCountry(id);};})(c.id));
+      var pct=c.sites>0?(c.visited/c.sites):0;
+      var alpha=(0.15+pct*0.85).toFixed(2);
+      var pinSvg='<svg class="country-pin-svg" width="26" height="34" viewBox="0 0 24 30"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 18 12 18s12-9 12-18c0-6.6-5.4-12-12-12z" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4.5" fill="#fff" opacity="'+alpha+'"/></svg>';
+      addMk(c.lng,c.lat,pinSvg+'<div class="lbl">'+c.name+'</div>',(function(id){return function(){drillCountry(id);};})(c.id),'country-pin');
     });
     flyTo(105,8,3);
   }
@@ -1364,7 +1374,11 @@ window.togglePanel=function(open){
   }
 };
 if(typeof ResizeObserver!=='undefined'){
-  new ResizeObserver(function(){map.invalidateSize();}).observe(document.getElementById('map-wrap'));
+  var resizeDebounce=null;
+  new ResizeObserver(function(){
+    clearTimeout(resizeDebounce);
+    resizeDebounce=setTimeout(function(){map.invalidateSize();},120);
+  }).observe(document.getElementById('map-wrap'));
 }
 document.getElementById('sq').addEventListener('input',function(e){var q=e.target.value.trim();if(!q)return;var c=COUNTRIES.find(function(x){return x.name.indexOf(q)>-1;});if(c)drillCountry(c.id);});
 function loadWorld(){ render(); }
