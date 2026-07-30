@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v77 - 2026-07-29（新增即時降雨雷達圖層功能，接上原本沒作用的雨滴按鈕） -->
+<!-- 內部版本紀錄：v78 - 2026-07-29（天氣圖層擴充：新增風速、雲量，改為可展開面板同時管理三種圖層） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -102,6 +102,16 @@ body{background:#0a1520;overflow:hidden}
 .spin{width:14px;height:14px;border:2px solid var(--b);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .wx-card{position:absolute;top:10px;left:10px;background:rgba(13,28,46,.94);border:0.5px solid rgba(56,189,248,.3);border-radius:10px;padding:7px 11px;font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:8px;z-index:6;opacity:0;transition:opacity .3s}
+.wx-panel{position:absolute;top:44px;right:10px;width:172px;background:rgba(13,28,46,.97);border:0.5px solid var(--b);border-radius:12px;padding:8px;z-index:9;display:none;flex-direction:column;gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.wx-panel.show{display:flex}
+.wx-row{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--t)}
+.wx-row:hover{background:rgba(255,255,255,.05)}
+.wx-row-label{display:flex;align-items:center;gap:8px}
+.wx-sw{width:30px;height:17px;border-radius:9px;background:rgba(255,255,255,.12);position:relative;flex-shrink:0;transition:background .2s}
+.wx-sw::after{content:'';position:absolute;width:13px;height:13px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s}
+.wx-row.active .wx-sw{background:var(--cyan)}
+.wx-row.active .wx-sw::after{left:15px}
+.wx-row.loading .wx-sw{opacity:.4}
 .wx-card.show{opacity:1}
 .wx-t{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--t)}
 .wx-sub{color:var(--tm);font-size:9px}
@@ -246,7 +256,12 @@ body{background:#0a1520;overflow:hidden}
       <div class="searchbox" id="searchbox"><span style="font-size:12px;color:var(--tm)" id="search-icon">🔍</span><input id="sq" placeholder="搜尋國家、島嶼、潛點，或打「我想看海龜」試試 AI"></div>
     </div>
     <div class="mode-pill" id="mode-pill" style="display:none">🧭 行程模式<span style="cursor:pointer;margin-left:2px" id="exit-itin">✕</span></div>
-    <div class="ib" id="rain-toggle" onclick="toggleRainRadar()" title="即時降雨雷達">🌧️</div>
+    <div class="ib" id="rain-toggle" onclick="toggleWxPanel()" title="天氣圖層">🌧️</div>
+    <div class="wx-panel" id="wx-panel">
+      <div class="wx-row" id="wx-row-rain" onclick="toggleWeatherLayer('rain')"><div class="wx-row-label">🌧️ 降雨雷達</div><div class="wx-sw"></div></div>
+      <div class="wx-row" id="wx-row-wind" onclick="toggleWeatherLayer('wind')"><div class="wx-row-label">💨 風速</div><div class="wx-sw"></div></div>
+      <div class="wx-row" id="wx-row-clouds" onclick="toggleWeatherLayer('clouds')"><div class="wx-row-label">☁️ 雲量</div><div class="wx-sw"></div></div>
+    </div>
     <div class="ib" onclick="goLevel('world')">🌐</div>
   </div>
   <div class="bc" id="bc"></div>
@@ -1155,30 +1170,50 @@ async function fetchRealWeather(isl){
     return {temp:isl.wxT,rain:isl.wxR,live:false};
   }
 }
-var rainLayer=null,rainApiData=null,rainOn=false;
-function toggleRainRadar(){
-  var btn=document.getElementById('rain-toggle');
-  rainOn=!rainOn;
-  btn.classList.toggle('on',rainOn);
-  if(!rainOn){
-    if(rainLayer){map.removeLayer(rainLayer);rainLayer=null;}
+var OWM_KEY='615473dd0c8b05c26aa945f79e84d76b';
+var weatherLayers={rain:null,wind:null,clouds:null};
+var rainApiData=null;
+window.toggleWxPanel=function(){
+  document.getElementById('wx-panel').classList.toggle('show');
+};
+document.addEventListener('click',function(e){
+  var panel=document.getElementById('wx-panel'),btn=document.getElementById('rain-toggle');
+  if(panel.classList.contains('show')&&!panel.contains(e.target)&&e.target!==btn){panel.classList.remove('show');}
+});
+function setRowState(type,state){
+  var row=document.getElementById('wx-row-'+type);
+  row.classList.toggle('active',state==='on');
+  row.classList.toggle('loading',state==='loading');
+  document.getElementById('rain-toggle').classList.toggle('on',!!weatherLayers.rain||!!weatherLayers.wind||!!weatherLayers.clouds);
+}
+window.toggleWeatherLayer=function(type){
+  if(weatherLayers[type]){
+    map.removeLayer(weatherLayers[type]);
+    weatherLayers[type]=null;
+    setRowState(type,'off');
     return;
   }
-  btn.classList.add('loading');
-  var applyLayer=function(){
-    btn.classList.remove('loading');
-    if(!rainApiData||!rainApiData.radar||!rainApiData.radar.past||!rainApiData.radar.past.length){
-      btn.classList.remove('on');rainOn=false;return;
-    }
-    var frame=rainApiData.radar.past[rainApiData.radar.past.length-1];
-    rainLayer=L.tileLayer(rainApiData.host+frame.path+'/256/{z}/{x}/{y}/2/1_1.png',{tileSize:256,opacity:0.55,maxNativeZoom:7,maxZoom:19,zIndex:5}).addTo(map);
-  };
-  if(rainApiData){applyLayer();return;}
-  fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){return r.json();}).then(function(data){rainApiData=data;applyLayer();}).catch(function(err){
-    console.error('rain radar fetch failed',err);
-    btn.classList.remove('loading','on');rainOn=false;
-  });
-}
+  setRowState(type,'loading');
+  if(type==='rain'){
+    var applyRain=function(){
+      if(!rainApiData||!rainApiData.radar||!rainApiData.radar.past||!rainApiData.radar.past.length){setRowState('rain','off');return;}
+      var frame=rainApiData.radar.past[rainApiData.radar.past.length-1];
+      weatherLayers.rain=L.tileLayer(rainApiData.host+frame.path+'/256/{z}/{x}/{y}/2/1_1.png',{tileSize:256,opacity:0.55,maxNativeZoom:7,maxZoom:19,zIndex:5}).addTo(map);
+      setRowState('rain','on');
+    };
+    if(rainApiData){applyRain();return;}
+    fetch('https://api.rainviewer.com/public/weather-maps.json').then(function(r){return r.json();}).then(function(data){rainApiData=data;applyRain();}).catch(function(err){
+      console.error('rain radar fetch failed',err);setRowState('rain','off');
+    });
+  } else {
+    var layerName=type==='wind'?'wind_new':'clouds_new';
+    var lyr=L.tileLayer('https://tile.openweathermap.org/map/'+layerName+'/{z}/{x}/{y}.png?appid='+OWM_KEY,{opacity:0.55,maxZoom:19,zIndex:5});
+    lyr.on('tileerror',function(){console.warn(type+' 圖層載入失敗，API key可能還沒生效或已達額度');});
+    lyr.addTo(map);
+    weatherLayers[type]=lyr;
+    setRowState(type,'on');
+  }
+};
 function updateWxCard(){
   var card=document.getElementById('wx-card');
   if(level!=='island'){card.classList.remove('show');return;}
