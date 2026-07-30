@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v78 - 2026-07-29（天氣圖層擴充：新增風速、雲量，改為可展開面板同時管理三種圖層） -->
+<!-- 內部版本紀錄：v79 - 2026-07-29（修正天氣面板CSS定位bug：topbar缺少position:relative導致面板點不到） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -39,7 +39,7 @@ body{background:#0a1520;overflow:hidden}
   font-family:'DM Sans',sans-serif;
 }
 .app{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw;margin:0}
-.topbar{background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:10}
+.topbar{position:relative;background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:10}
 .logo{font-size:15px;font-weight:600;color:var(--t);flex-shrink:0}
 .logo span{color:var(--blue)}
 .searchbox{flex:1;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
