@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v83 - 2026-07-30（國家圖釘改為膠囊圓形，統一固定顏色，移除造訪進度變色） -->
+<!-- 內部版本紀錄：v85 - 2026-08-03（修正天氣面板被麵包屑列蓋住的z-index衝突） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -39,7 +39,7 @@ body{background:#0a1520;overflow:hidden}
   font-family:'DM Sans',sans-serif;
 }
 .app{background:var(--bg);overflow:hidden;display:flex;flex-direction:column;height:100vh;height:100dvh;width:100vw;margin:0}
-.topbar{position:relative;background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:10}
+.topbar{position:relative;background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:15}
 .logo{font-size:15px;font-weight:600;color:var(--t);flex-shrink:0}
 .logo span{color:var(--blue)}
 .searchbox{flex:1;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
@@ -65,6 +65,7 @@ body{background:#0a1520;overflow:hidden}
 .si:hover{background:var(--hover)}
 .si.act{background:rgba(14,165,233,.1);border:0.5px solid rgba(14,165,233,.25)}
 .si-swatch{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.si-flag{width:16px;flex-shrink:0;font-size:13px;line-height:1;text-align:center}
 .si-name{font-size:12px;color:var(--t);flex:1}
 .si-sub{font-size:9px;color:var(--tm);font-family:'DM Mono',monospace;flex-shrink:0}
 .si-badge{font-size:8px;padding:1px 6px;border-radius:99px;flex-shrink:0;border:0.5px solid}
@@ -1415,7 +1416,7 @@ function renderBc(){
 }
 function renderSb(){
   var ttl=document.getElementById('sb-ttl'),list=document.getElementById('sb-list');
-  if(level==='world'){ttl.textContent='國家';list.innerHTML=COUNTRIES.map(function(c){return '<div class="si" onclick="drillCountry(\''+c.id+'\')"><div class="si-swatch" style="background:'+c.color+'"></div><div class="si-name">'+c.name+'</div><div class="si-sub">'+(c.sites||'—')+'</div></div>';}).join('');}
+  if(level==='world'){ttl.textContent='國家';list.innerHTML=COUNTRIES.map(function(c){return '<div class="si" onclick="drillCountry(\''+c.id+'\')"><div class="si-flag">'+(COUNTRY_FLAGS[c.id]||'')+'</div><div class="si-name">'+c.name+'</div><div class="si-sub">'+(c.sites||'—')+'</div></div>';}).join('');}
   else if(level==='country'){ttl.textContent='島嶼';var islands=ISLANDS[selCountry]||[];
     var html='';
     if(!islands.length){html='<div style="padding:10px;font-size:10px;color:var(--tm)">尚未收錄此國家的潛點資料</div>';}
