@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v79 - 2026-07-29（修正天氣面板CSS定位bug：topbar缺少position:relative導致面板點不到） -->
+<!-- 內部版本紀錄：v83 - 2026-07-30（國家圖釘改為膠囊圓形，統一固定顏色，移除造訪進度變色） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -103,6 +103,11 @@ body{background:#0a1520;overflow:hidden}
 @keyframes sp{to{transform:rotate(360deg)}}
 .wx-card{position:absolute;top:10px;left:10px;background:rgba(13,28,46,.94);border:0.5px solid rgba(56,189,248,.3);border-radius:10px;padding:7px 11px;font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:8px;z-index:6;opacity:0;transition:opacity .3s}
 .wx-panel{position:absolute;top:44px;right:10px;width:172px;background:rgba(13,28,46,.97);border:0.5px solid var(--b);border-radius:12px;padding:8px;z-index:9;display:none;flex-direction:column;gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.wx-legend{display:none;padding:8px 8px 4px;margin-top:2px;border-top:0.5px solid var(--b)}
+.wx-legend.show{display:block}
+.wx-legend-ttl{font-size:9px;color:var(--tm);margin-bottom:5px}
+.wx-legend-bar{height:6px;border-radius:3px;background:linear-gradient(90deg,#3b82f6,#22c55e,#eab308,#f97316,#ef4444,#a855f7)}
+.wx-legend-labels{display:flex;justify-content:space-between;font-size:7.5px;color:var(--tm);margin-top:3px}
 .wx-panel.show{display:flex}
 .wx-row{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--t)}
 .wx-row:hover{background:rgba(255,255,255,.05)}
@@ -119,7 +124,7 @@ body{background:#0a1520;overflow:hidden}
 .stats{position:absolute;bottom:10px;right:10px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-radius:10px;padding:8px 12px;z-index:6}
 .st-v{font-family:'DM Mono',monospace;font-size:14px;color:var(--t)}
 .dive-mk{position:absolute;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transform:translate(-50%,-50%);pointer-events:auto;transition:left .5s cubic-bezier(0.22,1,0.36,1),top .5s cubic-bezier(0.22,1,0.36,1);z-index:1}
-.dive-mk.country-pin{transform:translate(-50%,-100%);gap:1px}
+.dive-mk.country-pin{transform:translate(-50%,-50%);gap:1px}
 .country-pin-svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 .dive-mk:hover{z-index:3}
 .dive-mk .ring{width:13px;height:13px;border-radius:50%;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:7px}
@@ -259,8 +264,12 @@ body{background:#0a1520;overflow:hidden}
     <div class="ib" id="rain-toggle" onclick="toggleWxPanel()" title="天氣圖層">🌧️</div>
     <div class="wx-panel" id="wx-panel">
       <div class="wx-row" id="wx-row-rain" onclick="toggleWeatherLayer('rain')"><div class="wx-row-label">🌧️ 降雨雷達</div><div class="wx-sw"></div></div>
+      <div class="wx-legend" id="wx-legend-rain"><div class="wx-legend-ttl">降雨強度</div><div class="wx-legend-bar"></div><div class="wx-legend-labels"><span>陰天</span><span>毛毛雨</span><span>大雨</span><span>冰雹</span></div></div>
       <div class="wx-row" id="wx-row-wind" onclick="toggleWeatherLayer('wind')"><div class="wx-row-label">💨 風速</div><div class="wx-sw"></div></div>
+      <div class="wx-legend" id="wx-legend-wind"><div class="wx-legend-ttl">風速強度（一般慣例，非精確數值）</div><div class="wx-legend-bar" style="background:linear-gradient(90deg,#22c55e,#eab308,#f97316,#ef4444)"></div><div class="wx-legend-labels"><span>微風</span><span>強風</span></div></div>
       <div class="wx-row" id="wx-row-clouds" onclick="toggleWeatherLayer('clouds')"><div class="wx-row-label">☁️ 雲量</div><div class="wx-sw"></div></div>
+      <div class="wx-row" id="wx-row-temp" onclick="toggleWeatherLayer('temp')"><div class="wx-row-label">🌡️ 氣溫</div><div class="wx-sw"></div></div>
+      <div class="wx-row" id="wx-row-pressure" onclick="toggleWeatherLayer('pressure')"><div class="wx-row-label">📊 氣壓</div><div class="wx-sw"></div></div>
     </div>
     <div class="ib" onclick="goLevel('world')">🌐</div>
   </div>
@@ -284,6 +293,7 @@ body{background:#0a1520;overflow:hidden}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+var COUNTRY_FLAGS={id:'🇮🇩',ph:'🇵🇭',my:'🇲🇾',th:'🇹🇭',mv:'🇲🇻',au:'🇦🇺',tw:'🇹🇼',ec:'🇪🇨',jp:'🇯🇵',pw:'🇵🇼',vn:'🇻🇳',lk:'🇱🇰',mm:'🇲🇲',in:'🇮🇳'};
 var COUNTRIES=[
   {id:'id',name:'印尼',lat:-2,lng:118,color:'#0ea5e9',sites:197,visited:0},
   {id:'ph',name:'菲律賓',lat:12,lng:122,color:'#f59e0b',sites:40,visited:0},
@@ -1171,7 +1181,7 @@ async function fetchRealWeather(isl){
   }
 }
 var OWM_KEY='615473dd0c8b05c26aa945f79e84d76b';
-var weatherLayers={rain:null,wind:null,clouds:null};
+var weatherLayers={rain:null,wind:null,clouds:null,temp:null,pressure:null};
 var rainApiData=null;
 window.toggleWxPanel=function(){
   document.getElementById('wx-panel').classList.toggle('show');
@@ -1180,11 +1190,15 @@ document.addEventListener('click',function(e){
   var panel=document.getElementById('wx-panel'),btn=document.getElementById('rain-toggle');
   if(panel.classList.contains('show')&&!panel.contains(e.target)&&e.target!==btn){panel.classList.remove('show');}
 });
+var OWM_LAYER_MAP={wind:'wind_new',clouds:'clouds_new',temp:'temp_new',pressure:'pressure_new'};
 function setRowState(type,state){
   var row=document.getElementById('wx-row-'+type);
   row.classList.toggle('active',state==='on');
   row.classList.toggle('loading',state==='loading');
-  document.getElementById('rain-toggle').classList.toggle('on',!!weatherLayers.rain||!!weatherLayers.wind||!!weatherLayers.clouds);
+  var legend=document.getElementById('wx-legend-'+type);
+  if(legend)legend.classList.toggle('show',state==='on');
+  var anyOn=Object.keys(weatherLayers).some(function(k){return !!weatherLayers[k];});
+  document.getElementById('rain-toggle').classList.toggle('on',anyOn);
 }
 window.toggleWeatherLayer=function(type){
   if(weatherLayers[type]){
@@ -1206,7 +1220,7 @@ window.toggleWeatherLayer=function(type){
       console.error('rain radar fetch failed',err);setRowState('rain','off');
     });
   } else {
-    var layerName=type==='wind'?'wind_new':'clouds_new';
+    var layerName=OWM_LAYER_MAP[type];
     var lyr=L.tileLayer('https://tile.openweathermap.org/map/'+layerName+'/{z}/{x}/{y}.png?appid='+OWM_KEY,{opacity:0.55,maxZoom:19,zIndex:5});
     lyr.on('tileerror',function(){console.warn(type+' 圖層載入失敗，API key可能還沒生效或已達額度');});
     lyr.addTo(map);
@@ -1230,9 +1244,11 @@ window.render=function(){
   clearMk();renderBc();renderSb();renderStats();updateWxCard();
   if(level==='world'){
     COUNTRIES.forEach(function(c){
-      var pct=c.sites>0?(c.visited/c.sites):0;
-      var alpha=(0.15+pct*0.85).toFixed(2);
-      var pinSvg='<svg class="country-pin-svg" width="26" height="34" viewBox="0 0 24 30"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 18 12 18s12-9 12-18c0-6.6-5.4-12-12-12z" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4.5" fill="#fff" opacity="'+alpha+'"/></svg>';
+      var flag=COUNTRY_FLAGS[c.id]||'';
+      var pinSvg='<div style="position:relative;width:26px;height:26px">'
+        +'<svg class="country-pin-svg" width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="12" fill="#0ea5e9" stroke="#fff" stroke-width="1.5"/><circle cx="13" cy="13" r="4.5" fill="#fff" opacity="0.5"/></svg>'
+        +(flag?'<span style="position:absolute;top:-6px;right:-6px;font-size:13px;line-height:1;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.7))">'+flag+'</span>':'')
+        +'</div>';
       addMk(c.lng,c.lat,pinSvg+'<div class="lbl">'+c.name+'</div>',(function(id){return function(){drillCountry(id);};})(c.id),'country-pin');
     });
     flyTo(105,8,3);
