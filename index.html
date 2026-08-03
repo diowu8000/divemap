@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v85 - 2026-08-03（修正天氣面板被麵包屑列蓋住的z-index衝突） -->
+<!-- 內部版本紀錄：v86 - 2026-08-03（風速/雲量/氣溫/氣壓圖層調亮，解決淡色圖磚被深色地圖吃掉的問題） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -24,6 +24,7 @@
 <style>
 .leaflet-container{background:#0d1c2e;font-family:'DM Sans',sans-serif}
 .dm-tile{filter:brightness(1.9) contrast(1.15)}
+.owm-tile{mix-blend-mode:screen;filter:contrast(1.3) saturate(1.3)}
 .leaflet-control-attribution{background:rgba(10,21,32,.7)!important;color:var(--tm)!important;font-size:8px!important}
 .leaflet-control-attribution a{color:var(--ts)!important}
 .dive-mk{position:absolute;left:0;top:0}
@@ -1222,7 +1223,7 @@ window.toggleWeatherLayer=function(type){
     });
   } else {
     var layerName=OWM_LAYER_MAP[type];
-    var lyr=L.tileLayer('https://tile.openweathermap.org/map/'+layerName+'/{z}/{x}/{y}.png?appid='+OWM_KEY,{opacity:0.55,maxZoom:19,zIndex:5});
+    var lyr=L.tileLayer('https://tile.openweathermap.org/map/'+layerName+'/{z}/{x}/{y}.png?appid='+OWM_KEY,{opacity:0.85,maxZoom:19,zIndex:5,className:'owm-tile'});
     lyr.on('tileerror',function(){console.warn(type+' 圖層載入失敗，API key可能還沒生效或已達額度');});
     lyr.addTo(map);
     weatherLayers[type]=lyr;
