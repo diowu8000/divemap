@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v95 - 2026-08-04（地圖容器加上明確低z-index，確保搜尋下拉選單絕對在地圖上層） -->
+<!-- 內部版本紀錄：v96 - 2026-08-04（新增月相計算與海況資料：浪高、水溫） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -20,6 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api.open-meteo.com">
+<link rel="preconnect" href="https://marine-api.open-meteo.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 .leaflet-container{background:#0d1c2e;font-family:'DM Sans',sans-serif}
@@ -115,7 +116,11 @@ body{background:#0a1520;overflow:hidden}
 .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--tm);font-size:12px;gap:8px;z-index:20;background:var(--surf)}
 .spin{width:14px;height:14px;border:2px solid var(--b);border-top-color:var(--blue);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-.wx-card{position:absolute;top:10px;left:10px;background:rgba(13,28,46,.94);border:0.5px solid rgba(56,189,248,.3);border-radius:10px;padding:7px 11px;font-size:10px;color:var(--cyan);display:flex;align-items:center;gap:8px;z-index:6;opacity:0;transition:opacity .3s}
+.wx-card{position:absolute;top:10px;left:10px;background:rgba(13,28,46,.94);border:0.5px solid rgba(56,189,248,.3);border-radius:10px;padding:8px 12px;font-size:10px;color:var(--cyan);display:flex;flex-direction:column;gap:5px;z-index:6;opacity:0;pointer-events:none;transition:opacity .3s}
+.wx-card.show{opacity:1;pointer-events:auto}
+.wx-card-row{display:flex;align-items:center;gap:10px}
+.wx-card-row+.wx-card-row{padding-top:5px;border-top:0.5px solid rgba(56,189,248,.15)}
+.wx-item{display:flex;align-items:center;gap:4px}
 .wx-panel{position:absolute;top:44px;right:10px;width:172px;background:rgba(13,28,46,.97);border:0.5px solid var(--b);border-radius:12px;padding:8px;z-index:9;display:none;flex-direction:column;gap:2px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
 .wx-legend{display:none;padding:8px 8px 4px;margin-top:2px;border-top:0.5px solid var(--b)}
 .wx-legend.show{display:block}
@@ -1197,6 +1202,31 @@ async function fetchRealWeather(isl){
     return {temp:isl.wxT,rain:isl.wxR,live:false};
   }
 }
+var marineCache={};
+async function fetchMarineConditions(isl){
+  if(marineCache[isl.id])return marineCache[isl.id];
+  try{
+    var url='https://marine-api.open-meteo.com/v1/marine?latitude='+isl.lat+'&longitude='+isl.lng+'&current=wave_height,sea_surface_temperature&timezone=auto';
+    var res=await fetch(url);
+    var data=await res.json();
+    var result={waveHeight:Math.round(data.current.wave_height*10)/10,waterTemp:Math.round(data.current.sea_surface_temperature*10)/10,live:true};
+    marineCache[isl.id]=result;
+    return result;
+  }catch(err){
+    console.error('marine data fetch failed',err);
+    return {waveHeight:null,waterTemp:null,live:false};
+  }
+}
+function getMoonPhase(date){
+  var synodicMonth=2551443; // 朔望月週期（秒）
+  var knownNewMoon=new Date(Date.UTC(2000,0,6,18,14,0)).getTime();
+  var phase=((date.getTime()-knownNewMoon)/1000)%synodicMonth;
+  if(phase<0)phase+=synodicMonth;
+  var frac=phase/synodicMonth;
+  var names=['🌑 新月','🌒 眉月','🌓 上弦月','🌔 盈凸月','🌕 滿月','🌖 虧凸月','🌗 下弦月','🌘 殘月'];
+  var idx=Math.floor(frac*8+0.5)%8;
+  return {label:names[idx],illumination:Math.round((1-Math.cos(frac*2*Math.PI))/2*100)};
+}
 var OWM_KEY='615473dd0c8b05c26aa945f79e84d76b';
 var weatherLayers={rain:null,wind:null,clouds:null,temp:null,pressure:null};
 var rainApiData=null;
@@ -1250,11 +1280,23 @@ function updateWxCard(){
   if(level!=='island'){card.classList.remove('show');return;}
   var isl=(ISLANDS[selCountry]||[]).find(function(x){return x.id===selIsland;});
   if(!isl){card.classList.remove('show');return;}
-  card.innerHTML='☁️ <div><div class="wx-t">···</div><div class="wx-sub">查詢中</div></div>';
+  var moon=getMoonPhase(new Date());
+  card.innerHTML='<div class="wx-card-row">☁️ <div><div class="wx-t">···</div><div class="wx-sub">查詢中</div></div></div>'
+    +'<div class="wx-card-row"><div class="wx-item">'+moon.label+' '+moon.illumination+'%</div></div>';
   card.classList.add('show');
-  fetchRealWeather(isl).then(function(w){
+  Promise.all([fetchRealWeather(isl),fetchMarineConditions(isl)]).then(function(results){
     if(level!=='island'||selIsland!==isl.id)return;
-    card.innerHTML='☁️ <div><div class="wx-t">'+w.temp+'°C</div><div class="wx-sub">'+(w.live?'即時降雨 '+w.rain+'%':'降雨 '+w.rain+'%（離線估計）')+'</div></div>';
+    var w=results[0],m=results[1];
+    var row1='<div class="wx-card-row">☁️ <div><div class="wx-t">'+w.temp+'°C</div><div class="wx-sub">'+(w.live?'即時降雨 '+w.rain+'%':'降雨 '+w.rain+'%（離線估計）')+'</div></div></div>';
+    var row2='<div class="wx-card-row">';
+    if(m.live){
+      row2+='<div class="wx-item">🌊 '+m.waveHeight+'m</div><div class="wx-item">🌡️ 水溫 '+m.waterTemp+'°C</div>';
+    } else {
+      row2+='<div class="wx-item wx-sub">海況資料暫時無法取得</div>';
+    }
+    row2+='</div>';
+    var row3='<div class="wx-card-row"><div class="wx-item">'+moon.label+' '+moon.illumination+'%</div></div>';
+    card.innerHTML=row1+row2+row3;
   });
 }
 window.render=function(){
