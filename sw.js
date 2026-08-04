@@ -6,8 +6,8 @@ var CACHE_NAME = 'divemap-shell-v1'; // 之後若要強制清舊快取，把版�
 var SHELL_FILES = [
   './index.html',
   './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icon-192.png',
+  './icon-512.png'
 ];
 
 self.addEventListener('install', function (event) {
