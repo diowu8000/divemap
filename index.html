@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v86 - 2026-08-03（風速/雲量/氣溫/氣壓圖層調亮，解決淡色圖磚被深色地圖吃掉的問題） -->
+<!-- 內部版本紀錄：v91 - 2026-08-04（搜尋改為下拉選單，不再自動跳轉頁面） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -43,7 +43,19 @@ body{background:#0a1520;overflow:hidden}
 .topbar{position:relative;background:rgba(10,21,32,.97);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--b);flex-shrink:0;z-index:15}
 .logo{font-size:15px;font-weight:600;color:var(--t);flex-shrink:0}
 .logo span{color:var(--blue)}
-.searchbox{flex:1;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
+.search-wrap{position:relative;flex:1;min-width:0}
+.searchbox{background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px}
+.ai-btn{cursor:pointer;font-size:14px;flex-shrink:0;opacity:.75;transition:opacity .15s}
+.ai-btn:hover{opacity:1}
+.ai-btn.on{opacity:1;filter:drop-shadow(0 0 4px rgba(16,185,129,.6))}
+.search-dd{position:absolute;top:calc(100% + 6px);left:0;right:0;background:rgba(13,28,46,.98);border:0.5px solid var(--b);border-radius:12px;padding:5px;z-index:9;display:none;flex-direction:column;gap:1px;max-height:320px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,.45)}
+.search-dd.show{display:flex}
+.dd-item{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;font-size:12px;color:var(--t)}
+.dd-item:hover,.dd-item.hl{background:rgba(56,189,248,.12)}
+.dd-icon{font-size:13px;flex-shrink:0;width:16px;text-align:center}
+.dd-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dd-sub{font-size:9.5px;color:var(--tm);flex-shrink:0}
+.dd-empty{padding:10px 9px;font-size:11px;color:var(--tm);text-align:center}
 .searchbox input{background:none;border:none;outline:none;font-size:12px;color:var(--t);width:100%}
 .searchbox input::placeholder{color:var(--tm)}
 .ib{width:30px;height:30px;background:rgba(255,255,255,.06);border:0.5px solid var(--b);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ts);font-size:14px;cursor:pointer;flex-shrink:0}
@@ -260,7 +272,10 @@ body{background:#0a1520;overflow:hidden}
   <div class="topbar">
     <div class="logo">Dive<span>Map</span></div>
     <div class="searchwrap">
-      <div class="searchbox" id="searchbox"><span style="font-size:12px;color:var(--tm)" id="search-icon">🔍</span><input id="sq" placeholder="搜尋國家、島嶼、潛點，或打「我想看海龜」試試 AI"></div>
+      <div class="search-wrap" id="search-wrap">
+        <div class="searchbox" id="searchbox"><span style="font-size:12px;color:var(--tm)" id="search-icon">🔍</span><input id="sq" placeholder="搜尋國家、島嶼、潛點，或打「我想看海龜」試試 AI"><span class="ai-btn" id="ai-toggle" onclick="toggleAiMode()" title="切換 AI 規劃模式">🤖</span></div>
+        <div class="search-dd" id="search-dd"></div>
+      </div>
     </div>
     <div class="mode-pill" id="mode-pill" style="display:none">🧭 行程模式<span style="cursor:pointer;margin-left:2px" id="exit-itin">✕</span></div>
     <div class="ib" id="rain-toggle" onclick="toggleWxPanel()" title="天氣圖層">🌧️</div>
@@ -1358,7 +1373,7 @@ window.goLevel=function(lv){
   if(lv==='world'){
     if(mode==='route'){activeRoute=null;if(routeLine){map.removeLayer(routeLine);routeLine=null;}}
     if(mode==='itinerary'){itinerary=null;if(routeLine){map.removeLayer(routeLine);routeLine=null;}}
-    if(mode==='chat'){chatState={};}
+    if(mode==='chat'){chatState={};document.getElementById('ai-toggle').classList.remove('on');}
     mode='explore';
     document.getElementById('mode-pill').style.display='none';
     if(searchbox){searchbox.classList.remove('ai-mode');searchbox.style.opacity='1';}
@@ -1459,24 +1474,132 @@ if(typeof ResizeObserver!=='undefined'){
     resizeDebounce=setTimeout(function(){map.invalidateSize();},120);
   }).observe(document.getElementById('map-wrap'));
 }
-document.getElementById('sq').addEventListener('input',function(e){var q=e.target.value.trim();if(!q)return;var c=COUNTRIES.find(function(x){return x.name.indexOf(q)>-1;});if(c)drillCountry(c.id);});
 function loadWorld(){ render(); }
-/* ===== AI 對話規劃層（疊加，不影響探索模式與既有 154 個潛點資料）===== */
+/* ===== AI 對話規劃層（疊加，不影響探索模式與既有潛點資料）===== */
 var searchbox=document.getElementById('searchbox');
 var searchInput=document.getElementById('sq');
 var searchIcon=document.getElementById('search-icon');
+function findIslandCountry(islandId){
+  var found=null;
+  Object.keys(ISLANDS).forEach(function(k){if(found)return;if(ISLANDS[k].some(function(i){return i.id===islandId;}))found=k;});
+  return found;
+}
+function findAllMatches(q,limit){
+  limit=limit||8;
+  var ql=q.toLowerCase();
+  var results=[];
+  COUNTRIES.forEach(function(c){
+    if(results.length>=limit)return;
+    if(c.name.toLowerCase().indexOf(ql)>-1){
+      results.push({label:c.name,sub:(c.sites||0)+' 個潛點',icon:(COUNTRY_FLAGS[c.id]||'🌍'),nav:(function(id){return function(){drillCountry(id);};})(c.id)});
+    }
+  });
+  Object.keys(ISLANDS).forEach(function(k){
+    if(results.length>=limit)return;
+    ISLANDS[k].forEach(function(i){
+      if(results.length>=limit)return;
+      if(i.name.toLowerCase().indexOf(ql)>-1){
+        var cname=(COUNTRIES.find(function(x){return x.id===k;})||{}).name||'';
+        results.push({label:i.name,sub:cname,icon:'📍',nav:(function(country,islandId){return function(){drillCountry(country);drillIsland(islandId);};})(k,i.id)});
+      }
+    });
+  });
+  Object.keys(SITES).forEach(function(islId){
+    if(results.length>=limit)return;
+    SITES[islId].forEach(function(s,idx){
+      if(results.length>=limit)return;
+      if(s.name.toLowerCase().indexOf(ql)>-1){
+        var countryId=findIslandCountry(islId);
+        var islObj=(ISLANDS[countryId]||[]).find(function(i){return i.id===islId;});
+        results.push({label:s.name,sub:(islObj?islObj.name:''),icon:'🤿',nav:(function(country,island,i){return function(){drillCountry(country);drillIsland(island);setTimeout(function(){openSiteExt(i);},550);};})(countryId,islId,idx)});
+      }
+    });
+  });
+  if(results.length<limit){
+    Object.keys(SITES).forEach(function(islId){
+      if(results.length>=limit)return;
+      SITES[islId].forEach(function(s,idx){
+        if(results.length>=limit)return;
+        if(s.name.toLowerCase().indexOf(ql)>-1)return;
+        var hay=((s.diff||'')+' '+(s.wild||'')+' '+(s.desc||'')).toLowerCase();
+        if(hay.indexOf(ql)>-1){
+          var countryId=findIslandCountry(islId);
+          var islObj=(ISLANDS[countryId]||[]).find(function(i){return i.id===islId;});
+          results.push({label:s.name,sub:(islObj?islObj.name:'')+(s.wild?'・'+s.wild:''),icon:'🏷️',nav:(function(country,island,i){return function(){drillCountry(country);drillIsland(island);setTimeout(function(){openSiteExt(i);},550);};})(countryId,islId,idx)});
+        }
+      });
+    });
+  }
+  return results;
+}
+var ddHighlightIdx=-1;
+window.currentSearchResults=[];
+function renderSearchDD(q){
+  var dd=document.getElementById('search-dd');
+  ddHighlightIdx=-1;
+  if(!q){dd.classList.remove('show');dd.innerHTML='';window.currentSearchResults=[];return;}
+  var results=findAllMatches(q,8);
+  window.currentSearchResults=results;
+  if(!results.length){
+    dd.innerHTML='<div class="dd-empty">找不到符合的結果，按 Enter 讓 AI 幫你規劃</div>';
+  } else {
+    dd.innerHTML=results.map(function(r){return '<div class="dd-item"><span class="dd-icon">'+r.icon+'</span><span class="dd-main">'+r.label+'</span><span class="dd-sub">'+r.sub+'</span></div>';}).join('');
+    Array.prototype.forEach.call(dd.children,function(el,i){el.onclick=function(){results[i].nav();closeSearchDD();};});
+  }
+  dd.classList.add('show');
+}
+function closeSearchDD(){
+  var dd=document.getElementById('search-dd');
+  dd.classList.remove('show');dd.innerHTML='';
+  window.currentSearchResults=[];ddHighlightIdx=-1;
+}
+document.addEventListener('click',function(e){
+  var wrap=document.getElementById('search-wrap');
+  if(wrap && !wrap.contains(e.target))closeSearchDD();
+});
+document.getElementById('sq').addEventListener('input',function(e){
+  renderSearchDD(e.target.value.trim());
+});
 searchInput.addEventListener('keydown',function(e){
+  var dd=document.getElementById('search-dd');
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    var results=window.currentSearchResults||[];
+    if(!results.length)return;
+    e.preventDefault();
+    ddHighlightIdx+=(e.key==='ArrowDown'?1:-1);
+    if(ddHighlightIdx<0)ddHighlightIdx=results.length-1;
+    if(ddHighlightIdx>=results.length)ddHighlightIdx=0;
+    Array.prototype.forEach.call(dd.children,function(el,i){el.classList.toggle('hl',i===ddHighlightIdx);});
+    return;
+  }
+  if(e.key==='Escape'){closeSearchDD();return;}
   if(e.key!=='Enter')return;
   var v=searchInput.value.trim();if(!v)return;
-  var isNatural=v.length>=5 && /[想要幫我推薦？?]/.test(v);
-  if(isNatural){ startAiChat(v); }
-  else{
-    var c=COUNTRIES.find(function(x){return x.name.indexOf(v)>-1;});
-    var isl=null;Object.keys(ISLANDS).forEach(function(k){ISLANDS[k].forEach(function(i){if(i.name.indexOf(v)>-1)isl={country:k,id:i.id};});});
-    if(isl){drillCountry(isl.country);drillIsland(isl.id);}else if(c){drillCountry(c.id);}
-  }
+  var looksConversational=v.length>=4 && /[想要幫我推薦？?哪裡介紹規劃行程適合]/.test(v);
+  if(looksConversational){ closeSearchDD(); startAiChat(v); return; }
+  var results=window.currentSearchResults||[];
+  var pick=(ddHighlightIdx>=0&&results[ddHighlightIdx])?results[ddHighlightIdx]:results[0];
+  if(pick){ pick.nav(); closeSearchDD(); return; }
+  closeSearchDD();
+  startAiChat(v);
 });
+function toggleAiMode(){
+  if(mode==='chat'){
+    chatState={};
+    mode='explore';
+    document.getElementById('mode-pill').style.display='none';
+    searchbox.classList.remove('ai-mode');
+    searchIcon.textContent='🔍';searchIcon.style.color='';
+    searchInput.disabled=false;searchInput.value='';
+    document.getElementById('ai-toggle').classList.remove('on');
+    closePanel();
+    toggleSb(true);
+  } else {
+    startAiChat('');
+  }
+}
 function startAiChat(query){
+  document.getElementById('ai-toggle').classList.add('on');
   mode='chat';
   toggleSb(false);
   searchbox.classList.add('ai-mode');
@@ -1486,7 +1609,7 @@ function startAiChat(query){
   panel.classList.add('open');panel.classList.remove('itin-open');
   panel.innerHTML='<div class="chat-hdr">AI 規劃助手 ✨</div><div class="chat-body" id="chat-body"></div>';
   var body=document.getElementById('chat-body');
-  addBubble(body,query,'user');
+  if(query)addBubble(body,query,'user');
   addThinking(body,function(){
     addBubble(body,'好的，先確認幾個必要條件。你大概有幾天假期？','ai');
     addChips(body,['5 天','7 天','10 天以上'],function(v){
