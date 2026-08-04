@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v92 - 2026-08-04（大幅提高topbar/下拉選單z-index，修正被側邊欄蓋住的問題） -->
+<!-- 內部版本紀錄：v93 - 2026-08-04（關閉地圖圖磚高解析度請求，解決大量ERR_HTTP2_PROTOCOL_ERROR載入失敗） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -1131,7 +1131,7 @@ var expanded=false;
 var currentMarkers=[];
 var camScale=3; /* 現在代表 Leaflet 的實際 zoom 等級，非倍率 */
 var map=L.map('leaflet-map',{zoomControl:false,attributionControl:true,worldCopyJump:true,minZoom:2,maxZoom:19}).setView([8,105],3);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,detectRetina:true,subdomains:'abcd',className:'dm-tile',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',{maxZoom:20,subdomains:'abcd',className:'dm-tile',attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
 map.on('zoomend',function(){camScale=map.getZoom();});
 map.on('click',function(){
   if(mode!=='explore')return;
