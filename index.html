@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>DiveMap 潛水地圖</title>
-<!-- 內部版本紀錄：v94 - 2026-08-04（修正PWA圖示路徑，改用根目錄而非icons/子資料夾） -->
+<!-- 內部版本紀錄：v95 - 2026-08-04（地圖容器加上明確低z-index，確保搜尋下拉選單絕對在地圖上層） -->
 <meta name="description" content="全球潛點地圖，AI 行程規劃、船宿路線、即時天氣">
 <meta name="theme-color" content="#0a1520">
 <link rel="manifest" href="manifest.json">
@@ -105,7 +105,7 @@ body{background:#0a1520;overflow:hidden}
 .sb-peek.hidden{opacity:0;pointer-events:none}
 .panel-peek{position:absolute;right:0;top:12px;z-index:8;width:18px;height:40px;background:rgba(13,28,46,.92);border:0.5px solid var(--b);border-right:none;border-radius:10px 0 0 10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--tm)}
 .panel-peek.hidden{opacity:0;pointer-events:none}
-.map-wrap{flex:1;position:relative;overflow:hidden;background:var(--surf);cursor:grab}
+.map-wrap{flex:1;position:relative;overflow:hidden;background:var(--surf);cursor:grab;z-index:1}
 .map-layer{position:absolute;inset:0;transform-origin:0 0}
 .map-layer.animate{transition:transform .5s cubic-bezier(0.22,1,0.36,1)}
 .world-svg{position:absolute;left:0;top:0}
